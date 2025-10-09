@@ -1,0 +1,176 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "sqlite"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model Player {
+  id           String             @id @default(uuid())
+  name         String
+  phone        String?
+  balance      Int                @default(0)
+  createdAt    DateTime           @default(now())
+  intents      AttendanceIntent[]
+  actuals      AttendanceActual[]
+  txs          Transaction[]
+  inviteTokens MatchInviteToken[]
+  settlements  Settlement[]
+}
+
+model Match {
+  id              String             @id @default(uuid())
+  dateTime        DateTime
+  type            MatchType
+  status          MatchStatus
+  fieldCost       Int                @default(600000)
+  link            String
+  qrCodeRef       String
+  createdAt       DateTime           @default(now())
+  intents         AttendanceIntent[]
+  actuals         AttendanceActual[]
+  inviteTokens    MatchInviteToken[]
+  txs             Transaction[]
+  settlements     Settlement[]
+  customAttendees CustomAttendee[]
+}
+
+enum MatchType {
+  Internal
+  VsTeam
+}
+
+enum MatchStatus {
+  Draft
+  Collecting
+  Ready
+  NotReady
+  Settled
+}
+
+model AttendanceIntent {
+  id         String           @id @default(uuid())
+  matchId    String
+  playerId   String
+  status     AttendanceStatus
+  isLate     Boolean          @default(false)
+  note       String?
+  guestCount Int              @default(0)
+  createdAt  DateTime         @default(now())
+  match      Match            @relation(fields: [matchId], references: [id])
+  player     Player           @relation(fields: [playerId], references: [id])
+
+  @@unique([matchId, playerId])
+}
+
+enum AttendanceStatus {
+  Attending
+  Tentative
+  NotGoing
+}
+
+model AttendanceActual {
+  id             String   @id @default(uuid())
+  matchId        String
+  playerId       String
+  memberAttended Boolean  @default(false)
+  guestsAttended Int      @default(0)
+  createdAt      DateTime @default(now())
+  match          Match    @relation(fields: [matchId], references: [id])
+  player         Player   @relation(fields: [playerId], references: [id])
+
+  @@unique([matchId, playerId])
+}
+
+model Transaction {
+  id        String          @id @default(uuid())
+  playerId  String
+  matchId   String?
+  type      TransactionType
+  amount    Int
+  note      String?
+  createdAt DateTime        @default(now())
+  player    Player          @relation(fields: [playerId], references: [id])
+  match     Match?          @relation(fields: [matchId], references: [id])
+}
+
+model Settlement {
+  id        String          @id @default(uuid())
+  matchId   String
+  playerId  String?
+  customId  String?
+  amount    Int
+  paid      Boolean         @default(false)
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
+  match     Match           @relation(fields: [matchId], references: [id])
+  player    Player?         @relation(fields: [playerId], references: [id])
+  custom    CustomAttendee? @relation(fields: [customId], references: [id])
+
+  @@unique([matchId, playerId])
+  @@unique([matchId, customId])
+}
+
+model CustomAttendee {
+  id          String       @id @default(uuid())
+  matchId     String
+  name        String
+  guestCount  Int          @default(0)
+  createdAt   DateTime     @default(now())
+  match       Match        @relation(fields: [matchId], references: [id])
+  settlements Settlement[]
+}
+
+enum TransactionType {
+  TopUp
+  Charge
+  Refund
+}
+
+model TeamFundEntry {
+  id        String        @id @default(uuid())
+  direction FundDirection
+  amount    Int
+  note      String?
+  createdAt DateTime      @default(now())
+}
+
+enum FundDirection {
+  Income
+  Expense
+}
+
+model MatchInviteToken {
+  id        String       @id @default(uuid())
+  matchId   String
+  playerId  String
+  token     String       @unique
+  expiresAt DateTime
+  status    InviteStatus
+  match     Match        @relation(fields: [matchId], references: [id])
+  player    Player       @relation(fields: [playerId], references: [id])
+}
+
+enum InviteStatus {
+  Active
+  Revoked
+  Used
+}
+
+model PendingRosterRequest {
+  id        String              @id @default(uuid())
+  name      String
+  phone     String?
+  deviceId  String?
+  createdAt DateTime            @default(now())
+  status    RosterRequestStatus
+}
+
+enum RosterRequestStatus {
+  Pending
+  Approved
+  Rejected
+}

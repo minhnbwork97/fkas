@@ -1,9 +1,19 @@
 # Feature Specification: FKAS Onboarding (No Facebook Integration)
 
-**Feature Branch**: `001-actually-late-notice`  
+**Feature Branch**: `001-fkas-attendance-onboarding`  
 **Created**: 2025-10-08  
 **Status**: Draft  
 **Input**: "Late notice is Sat 18:00. No Facebook integration. Use link/QR in the existing group to route players to the new system; keep the flow simple and familiar to migrate from comment-based attendance."
+
+## Clarifications
+
+### Session 2025-10-08
+
+- Q: How should players be identified when submitting attendance (no login)? → A: Per-player magic link tokens shared weekly.
+- Q: Where does the player roster come from for sending magic links? → A: Players self-claim via generic link; organizer approves to add to roster.
+- Q: How do returning players get their link each week? → A: Use join code; app recognizes them via device cookie; no personal link shown.
+- Q: How does the organizer authenticate to approve self-claims and manage matches? → A: Admin PIN set in env.
+- Q: What is the maximum guest count per player? → A: No hard cap; guestCount can be >2; organizer monitors capacity.
 
 ## User Scenarios & Testing _(mandatory)_
 
@@ -28,7 +38,7 @@ As a player, I can mark 1 (Attending), 0.5 (Tentative), or 0 (Not Going), and op
 
 **Why this priority**: Mirrors the familiar comment shorthand to reduce friction.
 
-**Independent Test**: Submit each status and verify it updates immediately and can be changed later. Add +1/+2 and verify guest slots appear and count toward capacity and settlement.
+**Independent Test**: Submit each status and verify the UI reflects the new status within ≤1s and can be changed later. Add +1/+2 and verify guest slots appear and count toward capacity and settlement.
 
 **Acceptance Scenarios**:
 
@@ -136,6 +146,7 @@ As the treasurer, I can record fund income/expenses with timestamps, view curren
 - Timezone: all deadlines use Asia/Ho_Chi_Minh.
 - Link abuse: organizer can regenerate/disable link.
 - Name mismatches: allow quick alias edit by organizer.
+- Cleared cookies/new device: treat as unknown; queue for organizer one-tap approval to re-bind device.
 
 ## Requirements _(mandatory)_
 
@@ -146,30 +157,41 @@ As the treasurer, I can record fund income/expenses with timestamps, view curren
 - FR-003: Allow statuses 1/0.5/0 and optional Late + note; allow later updates.
 - FR-004: Enforce deadlines: confirm by Sat 10:00; Late by Sat 18:00; readiness check at 18:00.
 - FR-005: Readiness thresholds: Internal min 14 (max 20); Vs Team min 7 (max 13).
+- FR-005: Readiness thresholds: Internal min 14 (max 20); Vs Team min 7 (max 13). Guest seats contribute to totals: totalConfirmed = confirmedPlayers + sum(guestCount).
 - FR-006: Organizer override after deadlines.
 - FR-007: Record actual attendees and split 600,000 VND with remainder policy.
 - FR-008: Support prepaid balances: top‑ups, deductions, and transaction history.
 - FR-009: Minimal attendance page accessible via link/QR; no FB integration required.
 - FR-010: Show migration explainer matching legacy shorthand (1, 0.5, 0).
-- FR-011: Support guest invites via +1/+2 per player; guests count toward capacity and settlement.
+- FR-011: Support guest invites via +N per player; guests count toward capacity and settlement.
 - FR-012: Provide an alternative join method via a short join code (e.g., 6 characters) for each match.
 - FR-013: Allow organizer to change match type until 18:00; thresholds recomputed accordingly.
 - FR-014: Allow per‑match field cost entry; default to 600,000 VND if not set; settlement uses that value.
 - FR-015: Provide team fund management: record income/expense entries with amount, timestamp, and note; show running balance and history.
+- FR-016: Issue weekly per‑player magic link tokens that auto-map identity on open; tokens expire after match start or on organizer regeneration.
+- FR-017: Provide a generic self-claim link for new players to submit name (and optional phone); organizer approval adds them to the roster and issues their magic link.
+- FR-018: Recognize returning players via device cookie; when using join code or shared link, start attendance immediately if recognized; if device is new/unknown, require organizer approval once then bind device.
+- FR-019: Gate organizer actions (approve self‑claims, device re‑bind, match create/settle) behind an Admin PIN provided at runtime; PIN value set via environment variable.
 
 ### Assumptions
 
-- MVP uses name entry or prefilled roster; no login required.
+- MVP uses per‑player weekly magic links for identification; no login required. Join code remains as a backup.
 - Posting link/QR in the Facebook group reaches all players; no API integration.
+- Self-claim link is posted in the Facebook group weekly; no per-player DMs required.
 - Organizer can resolve duplicates or map names after the fact.
 - Guests do not require full profiles for MVP; optional guest names may be captured.
 - Join code is case‑insensitive and expires after match end or on organizer regeneration.
+- First-time players use the self-claim link; organizer must approve before they appear in the roster.
+- Simple duplicate prevention: treat same name + optional phone as same person; organizer can merge.
+- Device recognition uses cookies/local storage; clearing cookies or switching device triggers re-approval once to re-bind.
+- Admin access uses a simple PIN provided by the organizer (env: ADMIN_PIN). No user accounts required in MVP.
 
 ### Non‑Functional/Policy Requirements
 
 - NF-001: Tests optional; provide manual checklist and smoke script (per Constitution v1.1.0).
 - NF-002: Simple, consistent UX; primary task within 1–2 clicks.
 - NF-003: Performance: p95 primary interactions < 200ms; initial view < 2s.
+- NF-004: Observability: structured logs for attendance submit/update, organizer approvals, readiness evaluation, and settlement (minimal fields: matchId, playerId, action, outcome, latencyMs).
 
 ### Key Entities
 
@@ -179,6 +201,8 @@ As the treasurer, I can record fund income/expenses with timestamps, view curren
 - AttendanceActual: id, matchId, playerId
 - Transaction: id, playerId, matchId (optional), type (TopUp|Charge|Refund), amount, createdAt, note
 - TeamFundEntry: id, direction (Income|Expense), amount, createdAt, note
+- MatchInviteToken: id, matchId, playerId, token, expiresAt, status (Active|Revoked|Used)
+- PendingRosterRequest: id, name, phone (optional), createdAt, status (Pending|Approved|Rejected)
 
 ## Success Criteria _(mandatory)_
 

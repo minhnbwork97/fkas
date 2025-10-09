@@ -1,0 +1,124 @@
+openapi: 3.0.3
+info:
+  title: FKAS Attendance API (MVP)
+  version: 0.1.0
+servers:
+  - url: https://api.example.com
+paths:
+  /matches:
+    post:
+      summary: Create weekly match
+      operationId: createMatch
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                dateTime:
+                  type: string
+                  format: date-time
+                type:
+                  type: string
+                  enum: [Internal, VsTeam]
+                fieldCost:
+                  type: integer
+              required: [dateTime, type]
+      responses:
+        '201':
+          description: Created
+  /matches/{matchId}/attendance:
+    post:
+      summary: Submit or update attendance intent
+      operationId: submitAttendance
+      parameters:
+        - in: path
+          name: matchId
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                status:
+                  type: string
+                  enum: [Attending, Tentative, NotGoing]
+                isLate:
+                  type: boolean
+                note:
+                  type: string
+                guestCount:
+                  type: integer
+              required: [status]
+      responses:
+        '200':
+          description: Updated
+  /matches/{matchId}/readiness:
+    get:
+      summary: Get readiness status and counts
+      operationId: getReadiness
+      parameters:
+        - in: path
+          name: matchId
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+  /approvals/roster:
+    get:
+      summary: List pending roster requests
+      operationId: listRosterRequests
+      responses:
+        '200':
+          description: OK
+    post:
+      summary: Approve or reject roster request
+      operationId: decideRosterRequest
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                requestId:
+                  type: string
+                decision:
+                  type: string
+                  enum: [Approve, Reject]
+              required: [requestId, decision]
+      responses:
+        '200':
+          description: OK
+  /settlement/{matchId}:
+    post:
+      summary: Settle a match with actual attendees
+      operationId: settleMatch
+      parameters:
+        - in: path
+          name: matchId
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                actualPlayerIds:
+                  type: array
+                  items:
+                    type: string
+              required: [actualPlayerIds]
+      responses:
+        '200':
+          description: OK

@@ -1,14 +1,14 @@
 <!--
 Sync Impact Report
-- Version change: 1.0.0 → 1.1.0
-- Modified principles:
-  - I. Code Quality Is a Gate (Non‑Negotiable): unit tests optional for small project; require manual checklist + scripted smoke test
-- Added sections: None
+- Version change: 1.2.0 → 1.3.0
+- Modified principles: None
+- Added sections:
+  - VI. Development Environment Respect (new principle)
 - Removed sections: None
 - Templates requiring updates:
-  - ✅ .specify/templates/plan-template.md (Constitution Check: tests optional; rely on smoke/manual checks)
-  - ✅ .specify/templates/spec-template.md (no mandatory automated tests; alignment maintained)
-  - ✅ .specify/templates/tasks-template.md (already notes tests are optional)
+  - ✅ .specify/templates/plan-template.md (no changes needed)
+  - ✅ .specify/templates/spec-template.md (no changes needed)
+  - ✅ .specify/templates/tasks-template.md (no changes needed)
   - ⚠ .specify/templates/commands/ (directory not present; no action)
 - Follow-up TODOs: None
 -->
@@ -22,6 +22,7 @@ Sync Impact Report
 All contributions MUST meet objective quality gates before merge:
 
 - Lint and format clean with project defaults.
+- All code changes MUST pass TypeScript typecheck (`tsc --noEmit`) and lint (`eslint`) before commit/merge.
 - For this small project, automated unit tests are OPTIONAL.
 - Provide a concise manual verification checklist and a scripted smoke test that covers the primary path.
 - No P1/P2 static analysis issues or security findings in changed scope.
@@ -73,6 +74,17 @@ Favor minimal surface area and obvious paths:
 
 Rationale: Simplicity increases completion rates and decreases support.
 
+### VI. Development Environment Respect
+
+Agents MUST respect the developer's active development environment:
+
+- NEVER automatically run `npm run dev` or equivalent development servers.
+- Assume the developer is already running their preferred development setup.
+- Only suggest running development commands when explicitly requested or when troubleshooting requires it.
+- When testing changes, use existing running instances or clearly indicate when a restart is needed.
+
+Rationale: Developers often have custom configurations, multiple terminals, or specific development workflows that should not be disrupted by automated commands.
+
 ## Non‑Functional Standards
 
 - Languages, frameworks, and tools MUST be widely supported and actively maintained.
@@ -85,6 +97,7 @@ Rationale: Simplicity increases completion rates and decreases support.
 
 - Every PR includes: scope summary, user impact, screenshots for UI, and rollout plan if needed.
 - Quality gates from Principle I are enforced in CI; merges are blocked on failures.
+- After any code generation/edit by an agent, run TS typecheck and lint; fix errors before proceeding.
 - Reviews focus on correctness, simplicity, and UX consistency (Principles II & V).
 - Releases are automated; manual actions are documented and minimized.
 - Post‑release: monitor key metrics; rollback on user‑impacting regressions.
@@ -108,4 +121,4 @@ Compliance:
 - All PRs MUST attest compliance or explicitly document justified exceptions.
 - Exceptions are time‑boxed with an owner and tracked to closure.
 
-**Version**: 1.1.0 | **Ratified**: 2025-10-08 | **Last Amended**: 2025-10-08
+**Version**: 1.3.0 | **Ratified**: 2025-10-08 | **Last Amended**: 2025-01-09
