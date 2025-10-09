@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "postinstall": "prisma generate && prisma migrate deploy",
     "start": "next start",
     "lint": "eslint",
     "smoke": "bash ../scripts/smoke.sh"
