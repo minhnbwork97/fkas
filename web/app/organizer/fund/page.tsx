@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,6 +15,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useAuth } from "@/src/hooks/useAuth";
+import { ChevronDownIcon } from "lucide-react";
 
 type FundEntry = {
   id: string;
@@ -31,6 +32,14 @@ type FundSummary = {
   entryCount: number;
 };
 
+type Player = {
+  id: string;
+  name: string;
+  phone?: string | null;
+  balance?: number;
+  createdAt?: string;
+};
+
 export default function FundPage() {
   const router = useRouter();
   const { getPin } = useAuth();
@@ -38,19 +47,16 @@ export default function FundPage() {
   const [summary, setSummary] = useState<FundSummary | null>(null);
   const [msg, setMsg] = useState("");
 
+  // players for the 'performed by' select
+  const [players, setPlayers] = useState<Player[]>([]);
+  const [selectedPlayerId, setSelectedPlayerId] = useState<string | "">("");
+
   // New entry form
   const [direction, setDirection] = useState<"Income" | "Expense">("Income");
   const [amount, setAmount] = useState<string>("");
   const [note, setNote] = useState<string>("");
 
-  useEffect(() => {
-    const pin = getPin();
-    if (pin) {
-      loadFundData();
-    }
-  }, [getPin]);
-
-  async function loadFundData() {
+  const loadFundData = useCallback(async () => {
     const pin = getPin();
     if (!pin) return;
 
@@ -61,10 +67,29 @@ export default function FundPage() {
         setEntries(data.entries || []);
         setSummary(data.summary || null);
       }
+      // also load players for the select
+      try {
+        const playersRes = await fetch(
+          `/api/players?adminPin=${encodeURIComponent(pin)}`
+        );
+        if (playersRes.ok) {
+          const playersData = await playersRes.json();
+          setPlayers(playersData.players ?? []);
+        }
+      } catch (err) {
+        console.error("Error loading players:", err);
+      }
     } catch (error) {
       console.error("Error loading fund data:", error);
     }
-  }
+  }, [getPin]);
+
+  useEffect(() => {
+    const pin = getPin();
+    if (pin) {
+      loadFundData();
+    }
+  }, [getPin, loadFundData]);
 
   async function addEntry() {
     if (!amount || !direction) {
@@ -83,6 +108,7 @@ export default function FundPage() {
         direction,
         amount: parseInt(amount),
         note: note || null,
+        playerId: selectedPlayerId || null,
       }),
     });
 
@@ -95,6 +121,7 @@ export default function FundPage() {
     setMsg("Đã thêm thành công!");
     setAmount("");
     setNote("");
+    setSelectedPlayerId("");
     loadFundData(); // Reload data
   }
 
@@ -152,8 +179,8 @@ export default function FundPage() {
           <CardTitle>Thêm Giao Dịch Mới</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
+          <div className="flex flex-col md:flex-row flex-wrap gap-4">
+            <div className="space-y-2 flex-1">
               <Label>Loại Giao Dịch</Label>
               <Select
                 value={direction}
@@ -168,7 +195,26 @@ export default function FundPage() {
                 </SelectContent>
               </Select>
             </div>
-            <div className="space-y-2">
+            <div className="space-y-2 flex-2 flex flex-col">
+              <Label>Người thực hiện giao dịch</Label>
+              <Select
+                value={selectedPlayerId}
+                onValueChange={(v) => setSelectedPlayerId(v)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Chọn người thực hiện" />
+                </SelectTrigger>
+                <SelectContent>
+                  {players.map((p) => (
+                    <SelectItem key={p.id} value={p.id}>
+                      {p.name}
+                      {p.phone ? ` (${p.phone})` : ""}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2 flex-1">
               <Label>Số Tiền (VND)</Label>
               <Input
                 type="number"
@@ -193,12 +239,18 @@ export default function FundPage() {
         </CardContent>
       </Card>
 
-      {/* Transaction History */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Lịch Sử Giao Dịch</CardTitle>
-        </CardHeader>
-        <CardContent>
+      {/* Transaction History (accordion) */}
+      <details
+        open
+        className="bg-card text-card-foreground flex flex-col gap-6 rounded-xl border py-6 shadow-sm"
+      >
+        <summary className="px-6 cursor-pointer list-none flex items-center justify-between">
+          <div className="leading-none font-semibold">Lịch Sử Giao Dịch</div>
+          <div className="text-sm text-muted-foreground">
+            <ChevronDownIcon />
+          </div>
+        </summary>
+        <div className="px-6">
           <div className="space-y-3">
             {entries.length === 0 ? (
               <p className="text-gray-500 text-center py-4">
@@ -238,10 +290,47 @@ export default function FundPage() {
               ))
             )}
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </details>
 
       {msg && <p className="text-sm text-gray-600">{msg}</p>}
+
+      {/* Players List (accordion) */}
+      <details
+        open
+        className="bg-card text-card-foreground flex flex-col gap-6 rounded-xl border py-6 shadow-sm"
+      >
+        <summary className="px-6 cursor-pointer list-none flex items-center justify-between">
+          <div className="leading-none font-semibold">Số Dư Cầu Thủ</div>
+          <div className="text-sm text-muted-foreground">
+            <ChevronDownIcon />
+          </div>
+        </summary>
+        <div className="px-6">
+          {players.length === 0 ? (
+            <p className="text-gray-500 text-center py-4">Chưa có thành viên</p>
+          ) : (
+            <div className="space-y-2">
+              {players.map((p) => (
+                <div
+                  key={p.id}
+                  className="flex items-center justify-between p-3 border rounded-lg"
+                >
+                  <div>
+                    <div className="font-medium">{p.name}</div>
+                    {p.phone && (
+                      <div className="text-sm text-gray-600">{p.phone}</div>
+                    )}
+                  </div>
+                  <div className="text-right font-medium">
+                    {(p.balance ?? 0).toLocaleString("vi-VN")} VND
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </details>
     </main>
   );
 }

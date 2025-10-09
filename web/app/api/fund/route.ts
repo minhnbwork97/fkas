@@ -66,7 +66,7 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { adminPin, direction, amount, note } = body;
+    const { adminPin, direction, amount, note, playerId } = body;
 
     if (!adminPin) {
       return NextResponse.json(
@@ -102,8 +102,59 @@ export async function POST(req: NextRequest) {
         { status: 400 }
       );
     }
+    // If playerId is provided, ensure player exists and update balance in a transaction
+    if (playerId) {
+      // verify player exists
+      const player = await prisma.player.findUnique({
+        where: { id: playerId },
+      });
+      if (!player) {
+        return NextResponse.json(
+          { error: "player not found" },
+          { status: 404 }
+        );
+      }
 
-    // Create fund entry
+      // Run in a transaction: create entry and update player balance
+      const [entry, updatedPlayer] = await prisma.$transaction([
+        prisma.teamFundEntry.create({
+          data: {
+            direction,
+            amount,
+            note: note || null,
+          },
+        }),
+        prisma.player.update({
+          where: { id: playerId },
+          data: {
+            balance:
+              direction === "Income"
+                ? { increment: amount }
+                : { decrement: amount },
+          },
+        }),
+      ]);
+
+      return NextResponse.json(
+        {
+          success: true,
+          entry: {
+            id: entry.id,
+            direction: entry.direction,
+            amount: entry.amount,
+            note: entry.note,
+            createdAt: entry.createdAt.toISOString(),
+          },
+          player: {
+            id: updatedPlayer.id,
+            balance: updatedPlayer.balance,
+          },
+        },
+        { status: 200 }
+      );
+    }
+
+    // Create fund entry without player update
     const entry = await prisma.teamFundEntry.create({
       data: {
         direction,
