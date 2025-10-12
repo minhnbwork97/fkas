@@ -9,16 +9,15 @@ datasource db {
 }
 
 model Player {
-  id           String             @id @default(uuid())
-  name         String
-  phone        String?
-  balance      Int                @default(0)
-  createdAt    DateTime           @default(now())
-  intents      AttendanceIntent[]
-  actuals      AttendanceActual[]
-  txs          Transaction[]
-  inviteTokens MatchInviteToken[]
-  settlements  Settlement[]
+  id          String             @id @default(uuid())
+  name        String
+  phone       String?
+  balance     Int                @default(0)
+  createdAt   DateTime           @default(now())
+  intents     AttendanceIntent[]
+  actuals     AttendanceActual[]
+  txs         Transaction[]
+  settlements Settlement[]
 }
 
 model Match {
@@ -32,7 +31,6 @@ model Match {
   createdAt       DateTime           @default(now())
   intents         AttendanceIntent[]
   actuals         AttendanceActual[]
-  inviteTokens    MatchInviteToken[]
   txs             Transaction[]
   settlements     Settlement[]
   customAttendees CustomAttendee[]
@@ -128,36 +126,6 @@ enum TransactionType {
   TopUp
   Charge
   Refund
-}
-
-model TeamFundEntry {
-  id        String        @id @default(uuid())
-  direction FundDirection
-  amount    Int
-  note      String?
-  createdAt DateTime      @default(now())
-}
-
-enum FundDirection {
-  Income
-  Expense
-}
-
-model MatchInviteToken {
-  id        String       @id @default(uuid())
-  matchId   String
-  playerId  String
-  token     String       @unique
-  expiresAt DateTime
-  status    InviteStatus
-  match     Match        @relation(fields: [matchId], references: [id])
-  player    Player       @relation(fields: [playerId], references: [id])
-}
-
-enum InviteStatus {
-  Active
-  Revoked
-  Used
 }
 
 model PendingRosterRequest {

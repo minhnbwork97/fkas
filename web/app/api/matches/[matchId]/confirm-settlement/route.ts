@@ -60,10 +60,74 @@ export async function POST(
       );
     }
 
-    // Update match status to settled
-    await prisma.match.update({
-      where: { id: matchId },
-      data: { status: "Settled" },
+    // Get all unpaid settlements with players (not custom attendees)
+    const unpaidPlayerSettlements = await prisma.settlement.findMany({
+      where: {
+        matchId,
+        playerId: { not: null },
+        paid: false,
+      },
+      include: {
+        player: { select: { id: true, name: true, balance: true } },
+      },
+    });
+
+    // Format match date for transaction notes
+    const matchDate = new Date(match.dateTime);
+    const day = matchDate.getDate().toString().padStart(2, "0");
+    const month = (matchDate.getMonth() + 1).toString().padStart(2, "0");
+    const year = matchDate.getFullYear();
+    const formattedDate = `${day}/${month}/${year}`;
+
+    // Track how many settlements were auto-paid
+    let autoMarkedPaidCount = 0;
+
+    // Use transaction to update match status and auto-pay player settlements
+    await prisma.$transaction(async (tx) => {
+      // Update match status to settled
+      await tx.match.update({
+        where: { id: matchId },
+        data: { status: "Settled" },
+      });
+
+      // Auto-mark player settlements as paid ONLY if they have contributed to the fund
+      for (const settlement of unpaidPlayerSettlements) {
+        if (!settlement.player || !settlement.playerId) continue;
+
+        // Check if player has any previous transactions (indicating they've contributed to the fund)
+        const hasContributedToFund = await tx.transaction.count({
+          where: { playerId: settlement.playerId },
+        });
+
+        // Only mark as paid and deduct from fund if player has contributed before
+        if (hasContributedToFund > 0) {
+          // Mark settlement as paid
+          await tx.settlement.update({
+            where: { id: settlement.id },
+            data: { paid: true },
+          });
+
+          // Create charge transaction
+          await tx.transaction.create({
+            data: {
+              playerId: settlement.playerId,
+              matchId: matchId,
+              type: "Charge",
+              amount: -settlement.amount, // negative for deduction
+              note: `Trừ tiền sân ${formattedDate}`,
+            },
+          });
+
+          // Update player balance (allow negative)
+          await tx.player.update({
+            where: { id: settlement.playerId },
+            data: { balance: { decrement: settlement.amount } },
+          });
+
+          autoMarkedPaidCount++;
+        }
+        // If player has no fund transactions, leave settlement as unpaid (they need to pay cash)
+      }
     });
 
     return NextResponse.json(
@@ -72,6 +136,9 @@ export async function POST(
         message: "Đã xác nhận thanh toán trận đấu thành công",
         matchId,
         status: "Settled",
+        autoMarkedPaid: autoMarkedPaidCount,
+        totalUnpaid: unpaidPlayerSettlements.length,
+        remainingUnpaid: unpaidPlayerSettlements.length - autoMarkedPaidCount,
       },
       { status: 200 }
     );

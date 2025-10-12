@@ -345,18 +345,8 @@ export async function POST(
       }
     }
 
-    // Handle remainder - add to team fund if available
-    if (remainder > 0) {
-      await prisma.teamFundEntry.create({
-        data: {
-          direction: "Income",
-          amount: remainder,
-          note: `Số dư từ trận đấu ${new Date(
-            match.dateTime
-          ).toLocaleDateString("vi-VN")}`,
-        },
-      });
-    }
+    // Note: remainder is tracked but not recorded as a transaction
+    // since all fund tracking is now per-player via Transaction model
 
     // Note: Match status is NOT automatically set to "Settled" here
     // The organizer must explicitly confirm settlement via separate API call

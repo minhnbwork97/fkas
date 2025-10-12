@@ -596,7 +596,7 @@ export const MatchAttendance: React.FC = () => {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1">
           <div className="space-y-2">
             <Label className="text-sm sm:text-base">Thêm Bạn Bè</Label>
             <Input
@@ -613,7 +613,7 @@ export const MatchAttendance: React.FC = () => {
           </div>
 
           {status === "Attending" && (
-            <div className="flex items-center gap-2 sm:mt-8">
+            <div className="flex items-center gap-2 mt-4">
               <Checkbox
                 id="late"
                 checked={isLate}

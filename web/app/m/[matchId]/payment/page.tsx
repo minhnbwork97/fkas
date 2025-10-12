@@ -20,6 +20,9 @@ export default function MatchPaymentPage() {
     paid: boolean;
   } | null>(null);
   const [isReporting, setIsReporting] = useState(false);
+  const [playerBalance, setPlayerBalance] = useState<number | null>(null);
+  const [playerId, setPlayerId] = useState<string | null>(null);
+  const [hasTransactions, setHasTransactions] = useState<boolean>(false);
 
   useEffect(() => {
     const load = async () => {
@@ -42,7 +45,24 @@ export default function MatchPaymentPage() {
           setError("Không tìm thấy cầu thủ.");
           return;
         }
-        await playerRes.json();
+        const playerData = await playerRes.json();
+        setPlayerId(playerData.playerId);
+
+        // Fetch player balance and transaction status
+        const playerDetailRes = await fetch(
+          `/api/players/${playerData.playerId}`
+        );
+        if (playerDetailRes.ok) {
+          const playerDetail = await playerDetailRes.json();
+          console.log("Player detail:", playerDetail);
+          setPlayerBalance(playerDetail.balance);
+          setHasTransactions(playerDetail.hasTransactions || false);
+        } else {
+          console.error(
+            "Failed to fetch player balance:",
+            playerDetailRes.status
+          );
+        }
         // Load my settlement using deviceId (no admin pin)
         const myRes = await fetch(
           `/api/matches/${matchId}/my-settlement?deviceId=${encodeURIComponent(
@@ -92,6 +112,22 @@ export default function MatchPaymentPage() {
         toast.success(data.message || "Đã báo cáo thanh toán thành công!");
         // Update local state
         setMySettlement((prev) => (prev ? { ...prev, paid: true } : null));
+
+        // Refresh player balance after payment
+        if (playerId) {
+          const playerDetailRes = await fetch(`/api/players/${playerId}`);
+          if (playerDetailRes.ok) {
+            const playerDetail = await playerDetailRes.json();
+            console.log("Updated player balance:", playerDetail.balance);
+            setPlayerBalance(playerDetail.balance);
+            setHasTransactions(playerDetail.hasTransactions || false);
+          } else {
+            console.error(
+              "Failed to refresh player balance:",
+              playerDetailRes.status
+            );
+          }
+        }
       } else {
         toast.error(data.error || "Có lỗi xảy ra khi báo cáo thanh toán");
       }
@@ -104,6 +140,13 @@ export default function MatchPaymentPage() {
   };
 
   if (isLoading) return null;
+
+  console.log(
+    "Rendering payment page. Player balance:",
+    playerBalance,
+    "Type:",
+    typeof playerBalance
+  );
 
   return (
     <main className="max-w-xl mx-auto p-6 space-y-4">
@@ -141,6 +184,24 @@ export default function MatchPaymentPage() {
                 </div>
               </div>
 
+              {/* Fund balance display */}
+              {typeof playerBalance === "number" && (
+                <div className="p-3 bg-blue-50 rounded border border-blue-200">
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-blue-900">
+                      Số dư quỹ hiện tại
+                    </span>
+                    <span
+                      className={`font-semibold ${
+                        playerBalance >= 0 ? "text-blue-700" : "text-red-600"
+                      }`}
+                    >
+                      {playerBalance.toLocaleString("vi-VN")} VND
+                    </span>
+                  </div>
+                </div>
+              )}
+
               {!mySettlement.paid && (
                 <div className="space-y-2">
                   <p className="text-sm text-gray-600">
@@ -157,10 +218,21 @@ export default function MatchPaymentPage() {
               )}
 
               {mySettlement.paid && (
-                <div className="p-3 bg-green-50 border border-green-200 rounded">
-                  <p className="text-sm text-green-700">
+                <div className="p-3 bg-green-50 border border-green-200 rounded space-y-2">
+                  <p className="text-sm text-green-700 font-medium">
                     ✓ Cảm ơn bạn đã báo cáo thanh toán.
                   </p>
+                  <p className="text-sm text-green-700">
+                    Số tiền cần đóng:{" "}
+                    <span className="font-semibold">
+                      {mySettlement.amount.toLocaleString("vi-VN")} VND
+                    </span>
+                  </p>
+                  {hasTransactions && (
+                    <p className="text-sm text-green-700">
+                      Số tiền này đã được trừ vào quỹ của bạn.
+                    </p>
+                  )}
                 </div>
               )}
             </div>

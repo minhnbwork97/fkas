@@ -3,14 +3,25 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/src/hooks/useAuth";
+import { ChevronDownIcon } from "lucide-react";
 
 type Player = {
   id: string;
   name: string;
   phone?: string | null;
   balance: number;
+  createdAt: string;
+};
+
+type Transaction = {
+  id: string;
+  type: "TopUp" | "Charge" | "Refund";
+  amount: number;
+  note: string | null;
+  matchDate?: string;
   createdAt: string;
 };
 
@@ -28,6 +39,9 @@ export default function PlayerListPage() {
   const [pendingRequests, setPendingRequests] = useState<PendingRequest[]>([]);
   const [msg, setMsg] = useState("");
   const [isLoading, setIsLoading] = useState(true);
+  const [expandedPlayerId, setExpandedPlayerId] = useState<string | null>(null);
+  const [playerTransactions, setPlayerTransactions] = useState<Record<string, Transaction[]>>({});
+  const [loadingTransactions, setLoadingTransactions] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     const pin = getPin();
@@ -99,6 +113,41 @@ export default function PlayerListPage() {
     setPendingRequests((prev) => prev.filter((x) => x.id !== id));
   }
 
+  async function togglePlayerTransactions(playerId: string) {
+    if (expandedPlayerId === playerId) {
+      setExpandedPlayerId(null);
+      return;
+    }
+
+    setExpandedPlayerId(playerId);
+
+    // If transactions already loaded, don't reload
+    if (playerTransactions[playerId]) {
+      return;
+    }
+
+    // Load transactions for this player
+    const pin = getPin() || "";
+    setLoadingTransactions((prev) => ({ ...prev, [playerId]: true }));
+
+    try {
+      const res = await fetch(
+        `/api/players/${playerId}/transactions?adminPin=${encodeURIComponent(pin)}`
+      );
+      if (res.ok) {
+        const data = await res.json();
+        setPlayerTransactions((prev) => ({
+          ...prev,
+          [playerId]: data.transactions || [],
+        }));
+      }
+    } catch (error) {
+      console.error("Error loading transactions:", error);
+    } finally {
+      setLoadingTransactions((prev) => ({ ...prev, [playerId]: false }));
+    }
+  }
+
   if (isLoading) {
     return (
       <main className="max-w-4xl mx-auto p-6 space-y-4">
@@ -142,15 +191,107 @@ export default function PlayerListPage() {
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="flex items-center justify-between">
+                    <div className="flex items-center justify-between mb-3">
                       <div className="text-sm text-gray-600">
-                        Số dư: {player.balance.toLocaleString("vi-VN")} VND
+                        Số dư:{" "}
+                        <span
+                          className={
+                            player.balance < 0
+                              ? "text-red-600 font-semibold"
+                              : "font-semibold"
+                          }
+                        >
+                          {player.balance.toLocaleString("vi-VN")} VND
+                        </span>
                       </div>
                       <div className="text-sm text-gray-500">
                         Đăng ký:{" "}
                         {new Date(player.createdAt).toLocaleDateString("vi-VN")}
                       </div>
                     </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => togglePlayerTransactions(player.id)}
+                      className="w-full flex items-center justify-between"
+                    >
+                      <span>
+                        {expandedPlayerId === player.id
+                          ? "Ẩn Lịch Sử Giao Dịch"
+                          : "Xem Lịch Sử Giao Dịch"}
+                      </span>
+                      <ChevronDownIcon
+                        className={`transition-transform ${
+                          expandedPlayerId === player.id ? "rotate-180" : ""
+                        }`}
+                      />
+                    </Button>
+
+                    {expandedPlayerId === player.id && (
+                      <div className="mt-4 space-y-2 border-t pt-4">
+                        <h4 className="font-medium text-sm">
+                          Lịch Sử Giao Dịch
+                        </h4>
+                        {loadingTransactions[player.id] ? (
+                          <p className="text-sm text-gray-500 text-center py-4">
+                            Đang tải...
+                          </p>
+                        ) : playerTransactions[player.id]?.length === 0 ? (
+                          <p className="text-sm text-gray-500 text-center py-4">
+                            Chưa có giao dịch nào
+                          </p>
+                        ) : (
+                          <div className="space-y-2 max-h-96 overflow-y-auto">
+                            {playerTransactions[player.id]?.map((tx) => (
+                              <div
+                                key={tx.id}
+                                className="flex items-start justify-between p-3 bg-gray-50 rounded-lg border text-sm"
+                              >
+                                <div className="flex-1">
+                                  <div className="flex items-center gap-2 mb-1">
+                                    <Badge
+                                      variant={
+                                        tx.type === "TopUp"
+                                          ? "default"
+                                          : tx.type === "Charge"
+                                          ? "destructive"
+                                          : "secondary"
+                                      }
+                                    >
+                                      {tx.type === "TopUp"
+                                        ? "Nạp"
+                                        : tx.type === "Charge"
+                                        ? "Chi"
+                                        : "Hoàn"}
+                                    </Badge>
+                                    <span
+                                      className={`font-medium ${
+                                        tx.amount < 0
+                                          ? "text-red-600"
+                                          : "text-green-600"
+                                      }`}
+                                    >
+                                      {tx.amount > 0 ? "+" : ""}
+                                      {tx.amount.toLocaleString("vi-VN")} VND
+                                    </span>
+                                  </div>
+                                  {tx.note && (
+                                    <p className="text-gray-600 mb-1">
+                                      {tx.note}
+                                    </p>
+                                  )}
+                                  <p className="text-xs text-gray-500">
+                                    {new Date(tx.createdAt).toLocaleString(
+                                      "vi-VN"
+                                    )}
+                                  </p>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
               ))

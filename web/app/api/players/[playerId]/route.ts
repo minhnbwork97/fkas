@@ -11,7 +11,7 @@ export async function GET(
     // Direct UUID lookup
     const player = await prisma.player.findUnique({
       where: { id: playerId },
-      select: { id: true, name: true },
+      select: { id: true, name: true, balance: true },
     });
 
     if (!player) {
@@ -21,10 +21,17 @@ export async function GET(
       );
     }
 
+    // Count player's transactions to determine if they've used the fund system
+    const transactionCount = await prisma.transaction.count({
+      where: { playerId },
+    });
+
     return NextResponse.json(
       {
         id: player.id,
         name: player.name,
+        balance: player.balance,
+        hasTransactions: transactionCount > 0,
       },
       { status: 200 }
     );

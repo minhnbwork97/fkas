@@ -56,6 +56,8 @@ export default function SettlementPage() {
     Array<{ id: string; name: string; guestCount: number }>
   >([]);
   const [newCustomName, setNewCustomName] = useState<string>("");
+  const [hasAutoCalculated, setHasAutoCalculated] = useState(false);
+  const [isDataLoaded, setIsDataLoaded] = useState(false);
 
   useEffect(() => {
     const pin = localStorage.getItem(PIN_KEY);
@@ -208,7 +210,11 @@ export default function SettlementPage() {
                     }
                   }
                 })
-                .catch(() => {});
+                .catch(() => {})
+                .finally(() => {
+                  // Mark data as loaded after all initial data fetches are complete
+                  setIsDataLoaded(true);
+                });
             }
           })
           .catch(() => {});
@@ -246,6 +252,27 @@ export default function SettlementPage() {
       }
     }
   }, [attendance, customParticipants, summary?.fieldCost]); // Don't include summary to avoid infinite loop
+
+  // Auto-calculate settlement on initial page load
+  useEffect(() => {
+    if (
+      !hasAutoCalculated &&
+      isDataLoaded &&
+      attendance.length > 0 &&
+      !summary &&
+      !isLoadingSettlement
+    ) {
+      // Auto-calculate only once when all data is loaded and no existing settlement
+      setHasAutoCalculated(true);
+      calculateSummary();
+    }
+  }, [
+    hasAutoCalculated,
+    isDataLoaded,
+    attendance.length,
+    summary,
+    isLoadingSettlement,
+  ]);
 
   async function calculateSummary() {
     const customAttended = customParticipants; // All custom participants are considered attended
@@ -469,7 +496,68 @@ export default function SettlementPage() {
 
       if (response.ok) {
         setMatchStatus("Settled");
-        setMsg("✅ Đã xác nhận thanh toán trận đấu thành công!");
+        const autoMarkedPaid = data.autoMarkedPaid || 0;
+        const remainingUnpaid = data.remainingUnpaid || 0;
+        setMsg(
+          `✅ Đã xác nhận thanh toán trận đấu thành công!${
+            autoMarkedPaid > 0
+              ? ` Đã tự động đánh dấu thanh toán và trừ quỹ cho ${autoMarkedPaid} cầu thủ.`
+              : ""
+          }${
+            remainingUnpaid > 0
+              ? ` Còn ${remainingUnpaid} cầu thủ chưa có quỹ cần thanh toán thủ công.`
+              : ""
+          }`
+        );
+
+        // Reload settlements from backend to get accurate paid status
+        try {
+          const pin = localStorage.getItem(PIN_KEY) || "";
+          const res = await fetch(
+            `/api/matches/${matchId}/settlement?adminPin=${encodeURIComponent(
+              pin
+            )}`
+          );
+          if (res.ok) {
+            const s = await res.json();
+            if (s.settlements) {
+              const tx = s.settlements.map(
+                (x: {
+                  playerId?: string | null;
+                  customId?: string | null;
+                  player?: { name: string } | null;
+                  custom?: { name: string } | null;
+                  amount: number;
+                  paid: boolean;
+                }) => ({
+                  playerId: x.playerId ?? x.customId ?? "",
+                  playerName: x.player?.name ?? x.custom?.name ?? "",
+                  amount: x.amount,
+                  balanceBefore: 0,
+                  balanceAfter: 0,
+                  paid: x.paid, // Use actual paid status from backend
+                  isCustom: !!x.customId,
+                })
+              );
+              const paidAmount = tx.reduce(
+                (sum: number, t: { amount: number; paid: boolean }) =>
+                  sum + (t.paid ? t.amount : 0),
+                0
+              );
+              setSummary((prev) =>
+                prev
+                  ? {
+                      ...prev,
+                      transactions: tx,
+                      paidAmount,
+                    }
+                  : null
+              );
+            }
+          }
+        } catch (error) {
+          console.error("Error reloading settlements:", error);
+        }
       } else {
         setMsg(data.error || "Có lỗi xảy ra khi xác nhận thanh toán");
       }
@@ -569,7 +657,10 @@ export default function SettlementPage() {
               )}
             </div>
             <div className="flex gap-2">
-              <Button onClick={calculateSummary} disabled={isLoadingSettlement}>
+              <Button
+                onClick={calculateSummary}
+                disabled={isLoadingSettlement || matchStatus === "Settled"}
+              >
                 {isLoadingSettlement ? "Đang tính..." : "Tính Toán"}
               </Button>
               {summary && matchStatus !== "Settled" && (

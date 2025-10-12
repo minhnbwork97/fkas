@@ -1,7 +1,14 @@
 "use client";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { Home, LogOut } from "lucide-react";
+import {
+  Home,
+  LogOut,
+  Users,
+  DollarSign,
+  FileText,
+  Calendar,
+} from "lucide-react";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 
@@ -75,23 +82,30 @@ export default function OrganizerLayoutClient({
     );
   }
 
+  const navLinks = [
+    { href: "/organizer", label: "Trang Chủ", icon: Home },
+    { href: "/organizer/matches", label: "Trận Đấu", icon: Calendar },
+    { href: "/organizer/players", label: "Cầu Thủ", icon: Users },
+    { href: "/organizer/fund", label: "Quỹ Đội", icon: DollarSign },
+    { href: "/organizer/receivables", label: "Công Nợ", icon: FileText },
+  ];
+
+  const isActiveLink = (href: string) => {
+    if (href === "/organizer") {
+      return pathname === href;
+    }
+    return pathname.startsWith(href);
+  };
+
   return (
     <div className="min-h-screen bg-gray-50">
-      <header className="bg-white border-b border-gray-200 px-6 py-4">
-        <div className="max-w-4xl mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <Link href="/organizer">
-              <Button
-                variant="outline"
-                size="sm"
-                className="flex items-center gap-2"
-              >
-                <Home className="h-4 w-4" />
-                Về Trang Chủ
-              </Button>
-            </Link>
-          </div>
-          <div className="flex items-center gap-4">
+      <header className="bg-white border-b border-gray-200 sticky top-0 z-50">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6">
+          {/* Top bar with home and logout */}
+          <div className="flex items-center justify-between py-3 border-b border-gray-100">
+            <h1 className="text-lg font-semibold text-gray-900">
+              Quản Lý FKGT
+            </h1>
             <Button
               variant="outline"
               size="sm"
@@ -102,6 +116,30 @@ export default function OrganizerLayoutClient({
               Đăng Xuất
             </Button>
           </div>
+
+          {/* Navigation links */}
+          <nav className="flex items-center gap-1 overflow-x-auto py-2">
+            {navLinks.map((link) => {
+              const Icon = link.icon;
+              const active = isActiveLink(link.href);
+              return (
+                <Link key={link.href} href={link.href}>
+                  <Button
+                    variant={active ? "default" : "ghost"}
+                    size="sm"
+                    className={`flex items-center gap-2 whitespace-nowrap ${
+                      active
+                        ? "bg-blue-600 text-white hover:bg-blue-700"
+                        : "text-gray-700 hover:bg-gray-100"
+                    }`}
+                  >
+                    <Icon className="h-4 w-4" />
+                    {link.label}
+                  </Button>
+                </Link>
+              );
+            })}
+          </nav>
         </div>
       </header>
       <main>{children}</main>

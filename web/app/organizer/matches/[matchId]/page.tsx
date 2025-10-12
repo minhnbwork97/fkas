@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { CurrencyInput } from "@/components/ui/currency-input";
 import QRCode from "qrcode";
 import Image from "next/image";
 import { toast } from "sonner";
@@ -327,11 +328,10 @@ export default function OrganizerEditMatchPage() {
                     VND
                   </p>
                 ) : (
-                  <Input
-                    type="number"
+                  <CurrencyInput
                     value={fieldCost}
-                    onChange={(e) => setFieldCost(e.target.value)}
-                    placeholder="Chi phí sân (VND)"
+                    onValueChange={setFieldCost}
+                    placeholder="Chi phí sân"
                   />
                 )}
               </div>

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/src/lib/prisma";
 import { assertAdmin } from "@/src/lib/adminGuard";
 
@@ -6,6 +7,11 @@ export async function GET(req: NextRequest) {
   try {
     const url = new URL(req.url);
     const adminPin = url.searchParams.get("adminPin");
+    const playerIdFilter = url.searchParams.get("playerId");
+    const startDate = url.searchParams.get("startDate");
+    const endDate = url.searchParams.get("endDate");
+    const page = parseInt(url.searchParams.get("page") || "1", 10);
+    const pageSize = parseInt(url.searchParams.get("pageSize") || "10", 10);
 
     if (!adminPin) {
       return NextResponse.json(
@@ -21,36 +27,118 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "Invalid admin PIN" }, { status: 403 });
     }
 
-    // Get all fund entries
-    const entries = await prisma.teamFundEntry.findMany({
-      orderBy: { createdAt: "desc" },
+    // Build filter for transactions
+    const whereClause: Prisma.TransactionWhereInput = {};
+    if (playerIdFilter) {
+      whereClause.playerId = playerIdFilter;
+    }
+    if (startDate || endDate) {
+      whereClause.createdAt = {};
+      if (startDate) {
+        whereClause.createdAt.gte = new Date(startDate);
+      }
+      if (endDate) {
+        whereClause.createdAt.lte = new Date(endDate);
+      }
+    }
+
+    // Get all players with their balances
+    const players = await prisma.player.findMany({
+      select: { id: true, name: true, balance: true },
     });
 
-    // Calculate summary
-    const totalIncome = entries
-      .filter((e) => e.direction === "Income")
-      .reduce((sum, e) => sum + e.amount, 0);
+    const playerBalanceMap = new Map(players.map((p) => [p.id, p.balance]));
 
-    const totalExpense = entries
-      .filter((e) => e.direction === "Expense")
-      .reduce((sum, e) => sum + e.amount, 0);
+    // Calculate total fund as sum of all player balances
+    const currentBalance = players.reduce((sum, p) => sum + p.balance, 0);
 
-    const currentBalance = totalIncome - totalExpense;
+    // Get total count for pagination
+    const totalTransactions = await prisma.transaction.count({
+      where: whereClause,
+    });
+
+    // Calculate pagination
+    const totalPages = Math.ceil(totalTransactions / pageSize);
+    const skip = (page - 1) * pageSize;
+
+    // Get transactions ordered by oldest first for balance calculation
+    // We need all transactions for correct balance calculation
+    const allTransactions = await prisma.transaction.findMany({
+      where: whereClause,
+      orderBy: { createdAt: "asc" },
+      include: {
+        player: { select: { id: true, name: true } },
+        match: { select: { dateTime: true } },
+      },
+    });
+
+    // Calculate balanceBefore and balanceAfter for each transaction
+    const transactionsWithBalance = allTransactions.map((tx) => {
+      const currentPlayerBalance = playerBalanceMap.get(tx.playerId) || 0;
+
+      // Calculate balance before this transaction
+      // We need to subtract all transactions that happened after this one
+      const laterTransactions = allTransactions.filter(
+        (t) => t.playerId === tx.playerId && t.createdAt > tx.createdAt
+      );
+      const laterTransactionsTotal = laterTransactions.reduce(
+        (sum, t) => sum + t.amount,
+        0
+      );
+
+      const balanceBefore =
+        currentPlayerBalance - laterTransactionsTotal - tx.amount;
+      const balanceAfter = balanceBefore + tx.amount;
+
+      return {
+        id: tx.id,
+        type: tx.type,
+        amount: tx.amount,
+        note: tx.note,
+        playerId: tx.playerId,
+        playerName: tx.player.name,
+        matchId: tx.matchId,
+        matchDate: tx.match?.dateTime,
+        createdAt: tx.createdAt.toISOString(),
+        balanceBefore,
+        balanceAfter,
+      };
+    });
+
+    // Reverse to show newest first
+    transactionsWithBalance.reverse();
+
+    // Apply pagination to the final results
+    const paginatedTransactions = transactionsWithBalance.slice(
+      skip,
+      skip + pageSize
+    );
+
+    const totalIncome = allTransactions
+      .filter((t) => t.type === "TopUp")
+      .reduce((sum, t) => sum + t.amount, 0);
+
+    const totalExpense = Math.abs(
+      allTransactions
+        .filter((t) => t.type === "Charge")
+        .reduce((sum, t) => sum + t.amount, 0)
+    );
 
     return NextResponse.json(
       {
-        entries: entries.map((entry) => ({
-          id: entry.id,
-          direction: entry.direction,
-          amount: entry.amount,
-          note: entry.note,
-          createdAt: entry.createdAt.toISOString(),
-        })),
         summary: {
           currentBalance,
           totalIncome,
           totalExpense,
-          entryCount: entries.length,
+          transactionCount: totalTransactions,
+        },
+        transactions: paginatedTransactions,
+        pagination: {
+          page,
+          pageSize,
+          totalPages,
+          totalCount: totalTransactions,
+          hasMore: page < totalPages,
         },
       },
       { status: 200 }
@@ -102,8 +190,17 @@ export async function POST(req: NextRequest) {
         { status: 400 }
       );
     }
-    // If playerId is provided, ensure player exists and update balance in a transaction
-    if (playerId) {
+
+    // playerId is required - all fund transactions must be associated with a player
+    if (!playerId) {
+      return NextResponse.json(
+        { error: "playerId is required" },
+        { status: 400 }
+      );
+    }
+
+    // Ensure player exists and update balance in a transaction
+    {
       // verify player exists
       const player = await prisma.player.findUnique({
         where: { id: playerId },
@@ -115,16 +212,20 @@ export async function POST(req: NextRequest) {
         );
       }
 
-      // Run in a transaction: create entry and update player balance
-      const [entry, updatedPlayer] = await prisma.$transaction([
-        prisma.teamFundEntry.create({
+      // Run in a transaction: create player transaction and update player balance
+      const result = await prisma.$transaction(async (tx) => {
+        // Create Transaction record for player fund tracking
+        const transaction = await tx.transaction.create({
           data: {
-            direction,
-            amount,
+            playerId: playerId,
+            type: direction === "Income" ? "TopUp" : "Charge",
+            amount: direction === "Income" ? amount : -amount,
             note: note || null,
           },
-        }),
-        prisma.player.update({
+        });
+
+        // Update player balance
+        const updatedPlayer = await tx.player.update({
           where: { id: playerId },
           data: {
             balance:
@@ -132,50 +233,29 @@ export async function POST(req: NextRequest) {
                 ? { increment: amount }
                 : { decrement: amount },
           },
-        }),
-      ]);
+        });
+
+        return { transaction, updatedPlayer };
+      });
 
       return NextResponse.json(
         {
           success: true,
-          entry: {
-            id: entry.id,
-            direction: entry.direction,
-            amount: entry.amount,
-            note: entry.note,
-            createdAt: entry.createdAt.toISOString(),
+          transaction: {
+            id: result.transaction.id,
+            type: result.transaction.type,
+            amount: result.transaction.amount,
+            note: result.transaction.note,
+            createdAt: result.transaction.createdAt.toISOString(),
           },
           player: {
-            id: updatedPlayer.id,
-            balance: updatedPlayer.balance,
+            id: result.updatedPlayer.id,
+            balance: result.updatedPlayer.balance,
           },
         },
         { status: 200 }
       );
     }
-
-    // Create fund entry without player update
-    const entry = await prisma.teamFundEntry.create({
-      data: {
-        direction,
-        amount,
-        note: note || null,
-      },
-    });
-
-    return NextResponse.json(
-      {
-        success: true,
-        entry: {
-          id: entry.id,
-          direction: entry.direction,
-          amount: entry.amount,
-          note: entry.note,
-          createdAt: entry.createdAt.toISOString(),
-        },
-      },
-      { status: 200 }
-    );
   } catch (e: unknown) {
     return NextResponse.json(
       { error: e instanceof Error ? e.message : "Lỗi hệ thống" },

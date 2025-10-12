@@ -68,27 +68,67 @@ export async function POST(
       );
     }
 
-    // Update the settlement to mark as paid (self-reported)
-    const updatedSettlement = await prisma.settlement.update({
-      where: { id: settlement.id },
-      data: {
-        paid: true,
-        // Note: We could add a field to track if this was self-reported vs admin-confirmed
-        // but for now we'll just mark as paid
-      },
-      include: {
-        player: { select: { id: true, name: true } },
-      },
+    // Check if player has any previous transactions (indicating they've contributed to the fund)
+    const hasContributedToFund = await prisma.transaction.count({
+      where: { playerId: playerId },
+    });
+
+    // Use transaction to ensure atomicity when deducting from fund
+    const result = await prisma.$transaction(async (tx) => {
+      const updatedSettlement = await tx.settlement.update({
+        where: { id: settlement.id },
+        data: {
+          paid: true,
+          // Note: We could add a field to track if this was self-reported vs admin-confirmed
+          // but for now we'll just mark as paid
+        },
+        include: {
+          player: { select: { id: true, name: true, balance: true } },
+          match: { select: { dateTime: true } },
+        },
+      });
+
+      // Only deduct from player fund if they have contributed to the fund before (have previous transactions)
+      if (updatedSettlement.player && hasContributedToFund > 0) {
+        // Deduct the full settlement amount from player fund
+        const deductAmount = updatedSettlement.amount;
+
+        // Format match date as "dd/MM/yyyy"
+        const matchDate = new Date(updatedSettlement.match.dateTime);
+        const day = matchDate.getDate().toString().padStart(2, "0");
+        const month = (matchDate.getMonth() + 1).toString().padStart(2, "0");
+        const year = matchDate.getFullYear();
+        const formattedDate = `${day}/${month}/${year}`;
+
+        // Create charge transaction
+        await tx.transaction.create({
+          data: {
+            playerId: playerId,
+            matchId: matchId,
+            type: "Charge",
+            amount: -deductAmount, // negative for deduction
+            note: `Trừ tiền sân ${formattedDate}`,
+          },
+        });
+
+        // Update player balance (allow negative)
+        await tx.player.update({
+          where: { id: playerId },
+          data: { balance: { decrement: deductAmount } },
+        });
+      }
+
+      return updatedSettlement;
     });
 
     return NextResponse.json({
       success: true,
       message: "Đã ghi nhận báo cáo thanh toán của bạn",
       settlement: {
-        id: updatedSettlement.id,
-        amount: updatedSettlement.amount,
-        paid: updatedSettlement.paid,
-        playerName: updatedSettlement.player?.name,
+        id: result.id,
+        amount: result.amount,
+        paid: result.paid,
+        playerName: result.player?.name,
       },
     });
   } catch (error) {

@@ -30,6 +30,12 @@ export default function OrganizerPage() {
         >
           Quản Lý Quỹ
         </Button>
+        <Button
+          variant="outline"
+          onClick={() => router.push("/organizer/receivables")}
+        >
+          Quản Lý Công Nợ
+        </Button>
       </div>
     </main>
   );

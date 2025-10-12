@@ -11,6 +11,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { CurrencyInput } from "@/components/ui/currency-input";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
@@ -92,11 +93,11 @@ export default function CreateMatchPage() {
             </Select>
           </div>
           <div className="space-y-2">
-            <Label>Chi Phí Sân (VND)</Label>
-            <Input
-              type="number"
+            <Label>Chi Phí Sân</Label>
+            <CurrencyInput
               value={fieldCost}
-              onChange={(e) => setFieldCost(e.target.value)}
+              onValueChange={setFieldCost}
+              placeholder="600000"
             />
           </div>
           <Button onClick={createMatch}>Tạo Trận Đấu</Button>
