@@ -18,6 +18,7 @@ export default function MatchPaymentPage() {
   const [mySettlement, setMySettlement] = useState<{
     amount: number;
     paid: boolean;
+    qrCodeUrl?: string | null;
   } | null>(null);
   const [isReporting, setIsReporting] = useState(false);
   const [playerBalance, setPlayerBalance] = useState<number | null>(null);
@@ -73,7 +74,11 @@ export default function MatchPaymentPage() {
           const d = await myRes.json();
           console.log({ d });
           if (d.hasSettlement)
-            setMySettlement({ amount: d.amount, paid: d.paid });
+            setMySettlement({
+              amount: d.amount,
+              paid: d.paid,
+              qrCodeUrl: d.qrCodeUrl,
+            });
         }
       } catch {
         setError("Lỗi tải dữ liệu.");
@@ -203,17 +208,64 @@ export default function MatchPaymentPage() {
               )}
 
               {!mySettlement.paid && (
-                <div className="space-y-2">
-                  <p className="text-sm text-gray-600">
-                    Đã thanh toán rồi? Bấm nút bên dưới để thông báo.
-                  </p>
-                  <Button
-                    onClick={handleSelfReportPayment}
-                    disabled={isReporting}
-                    className="w-full"
-                  >
-                    {isReporting ? "Đang báo cáo..." : "Tôi đã thanh toán"}
-                  </Button>
+                <div className="space-y-4">
+                  {/* QR Code Section */}
+                  {mySettlement.qrCodeUrl && (
+                    <div className="p-4 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-lg border-2 border-blue-200">
+                      <div className="text-center space-y-3">
+                        <div className="flex items-center justify-center gap-2 text-blue-900 font-semibold">
+                          <svg
+                            className="w-5 h-5"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z"
+                            />
+                          </svg>
+                          <span>Quét mã QR để thanh toán</span>
+                        </div>
+
+                        <div className="bg-white p-3 rounded-lg inline-block shadow-sm">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={mySettlement.qrCodeUrl}
+                            alt="QR Code thanh toán"
+                            className="w-64 h-64 mx-auto"
+                          />
+                        </div>
+
+                        <div className="text-sm space-y-1">
+                          <p className="text-blue-800">
+                            💳 Mở app ngân hàng → Quét QR → Thanh toán
+                          </p>
+                          <p className="text-xs text-blue-600">
+                            Sau khi thanh toán, nhấn nút xác nhận bên dưới
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Manual Payment Confirmation */}
+                  <div className="space-y-2">
+                    <p className="text-sm text-gray-600">
+                      {mySettlement.qrCodeUrl
+                        ? "Sau khi thanh toán, bấm nút bên dưới:"
+                        : "Đã thanh toán rồi? Bấm nút bên dưới để thông báo."}
+                    </p>
+                    <Button
+                      onClick={handleSelfReportPayment}
+                      disabled={isReporting}
+                      className="w-full"
+                    >
+                      {isReporting ? "Đang báo cáo..." : "Tôi đã thanh toán"}
+                    </Button>
+                  </div>
                 </div>
               )}
 

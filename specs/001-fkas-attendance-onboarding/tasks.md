@@ -179,6 +179,35 @@
 - [x] T046 [P] UX consistency pass (components, spacing, contrast)
 - [x] T047 [P] Smoke script run and fix issues
 - [x] T048 Update skeleton for match-detail-page.tsx to match new interface structure (radio buttons, compact layout, grid layout)
+- [x] T049 Add fund deduction when payment is marked (organizer or self-report) in settlement/payment/route.ts and self-report-payment/route.ts
+- [x] T050 Allow negative player fund balances and ensure Transaction records track all balance changes (TopUp/Charge only)
+- [x] T051 Create Autocomplete UI component and replace player selection dropdown with autocomplete in fund page
+- [x] T052 Create CurrencyInput component with Vietnamese thousand separators and replace all money input fields (fund, create match, edit match)
+- [x] T053 Update CurrencyInput to format numbers in real-time as user types for better visibility
+- [x] T054 Update transaction notes to use format "Trừ tiền sân {dd/MM/yyyy}" when players pay for matches
+- [x] T055 Create player transaction history API endpoint and display in organizer player list page
+- [x] T056 Simplify fund model: remove TeamFundEntry, calculate total fund from player balances, require playerId for all transactions
+- [x] T057 Display all transactions in fund page instead of player balances (balances already shown in players page)
+- [x] T058 Add transaction balance tracking and filters: show balance before/after for each transaction, add player and date range filters
+- [x] T059 Replace transaction type Select dropdown with radio buttons for easier interaction
+- [x] T060 Create receivables management page: show unpaid settlements with filters by match and player, quick mark-as-paid action
+- [x] T061 Make receivables items clickable to navigate to match settlement page with visual feedback
+- [x] T062 Fix mark-as-paid API to support both PUT and PATCH methods, improve error handling for JSON parsing
+- [x] T063 Add pagination to fund transaction history (10 items per page) with page controls and filter support
+- [x] T064 Make transaction items clickable to navigate to match settlement page when transaction has matchId
+- [x] T065 Add prominent warning card in fund page to display players with negative balance, sorted by most negative first
+- [x] T066 Auto-calculate settlement when first entering the settlement page (no need to manually click "Calculate" button)
+- [x] T067 Disable "Calculate" button when match is already Settled
+- [x] T068 Auto-mark player settlements as paid and deduct from fund when confirming settlement (allow negative balance)
+- [x] T069 Add fund balance display and deduction notification to player payment page: fetch player balance, show notification when paid that amount was deducted from fund, display current fund balance
+- [x] T070 Add navigation header with quick route links to all management pages (Trang Chủ, Trận Đấu, Cầu Thủ, Quỹ Đội, Công Nợ) with active state highlighting
+- [x] T071 Fix fund deduction logic: only auto-deduct from fund when marking payment as paid if player has previous transactions (indicating they've contributed to the fund)
+- [x] T072 Fix payment page UI messaging: only show "đã được trừ vào quỹ" message if player has previous transactions (hasTransactions flag from API)
+- [x] T073 Fix confirm-settlement to only auto-mark as paid for players with fund transactions; leave unpaid for players without fund (they need to pay cash manually)
+- [x] T074 Fix settlement page UI bug: reload settlement data from backend after confirm-settlement instead of marking all players as paid in frontend
+- [x] T075 Remove MatchInviteToken table and InviteStatus enum from database schema (not needed for current implementation)
+- [x] T076 Fix TypeScript build errors: replace 'any' types with proper Prisma types (TransactionWhereInput, SettlementWhereInput) in fund and receivables API routes
+- [x] T077 Create comprehensive onboarding guide on homepage with step-by-step instructions and screenshots (registration, attendance, payment flows)
 
 ---
 

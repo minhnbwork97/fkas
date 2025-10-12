@@ -49,22 +49,7 @@
 - note (string, optional)
 - createdAt (datetime)
 
-### TeamFundEntry
-
-- id (uuid)
-- direction (enum: Income|Expense)
-- amount (int, VND)
-- note (string, optional)
-- createdAt (datetime)
-
-### MatchInviteToken
-
-- id (uuid)
-- matchId (uuid, fk Match)
-- playerId (uuid, fk Player)
-- token (string)
-- expiresAt (datetime)
-- status (enum: Active|Revoked|Used)
+**Note**: All fund tracking is done via Transaction records associated with players. Total fund = sum of all Player.balance values.
 
 ### PendingRosterRequest
 
@@ -80,7 +65,6 @@
 - Player 1..\* AttendanceIntent
 - Match 1..\* AttendanceIntent
 - Match 1..\* AttendanceActual
-- Match 1..\* MatchInviteToken
 
 ## Rules & Constraints
 

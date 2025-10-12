@@ -1,5 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/src/lib/prisma";
+import {
+  generatePaymentQR,
+  getBankInfo,
+  formatMatchPaymentDescription,
+} from "@/src/lib/qr-payment";
 
 export async function GET(
   req: NextRequest,
@@ -46,12 +51,39 @@ export async function GET(
       return NextResponse.json({ hasSettlement: false }, { status: 200 });
     }
 
+    // Generate QR code if bank info is configured and payment not yet made
+    let qrCodeUrl: string | null = null;
+    if (!settlement.paid) {
+      const bankInfo = getBankInfo();
+      if (bankInfo) {
+        // Get match info for description
+        const match = await prisma.match.findUnique({
+          where: { id: matchId },
+          select: { dateTime: true },
+        });
+
+        if (match) {
+          const description = formatMatchPaymentDescription(
+            new Date(match.dateTime),
+            matchId
+          );
+
+          qrCodeUrl = await generatePaymentQR({
+            bankInfo,
+            amount: settlement.amount,
+            description,
+          });
+        }
+      }
+    }
+
     return NextResponse.json(
       {
         hasSettlement: true,
         amount: settlement.amount,
         paid: settlement.paid,
         playerName: player.name,
+        qrCodeUrl, // Include QR code if generated
       },
       { status: 200 }
     );
