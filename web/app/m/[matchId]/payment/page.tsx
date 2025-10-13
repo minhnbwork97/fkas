@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import { getDeviceId } from "@/src/lib/deviceFingerprint";
 import { toast } from "sonner";
 
@@ -144,7 +145,64 @@ export default function MatchPaymentPage() {
     }
   };
 
-  if (isLoading) return null;
+  if (isLoading) {
+    return (
+      <main className="max-w-xl mx-auto p-6 space-y-4">
+        <Card>
+          <CardHeader>
+            <Skeleton className="h-6 w-48" />
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {/* Match info skeleton */}
+            <Skeleton className="h-4 w-64" />
+
+            {/* Settlement info skeleton */}
+            <div className="p-3 bg-gray-50 rounded border space-y-2">
+              <div className="flex justify-between">
+                <Skeleton className="h-4 w-32" />
+                <Skeleton className="h-4 w-24" />
+              </div>
+              <div className="flex items-center gap-2">
+                <Skeleton className="h-4 w-20" />
+                <Skeleton className="h-4 w-24" />
+              </div>
+            </div>
+
+            {/* Player balance skeleton */}
+            <div className="p-3 bg-blue-50 rounded border border-blue-200">
+              <div className="flex justify-between items-center">
+                <Skeleton className="h-4 w-32" />
+                <Skeleton className="h-4 w-20" />
+              </div>
+            </div>
+
+            {/* QR Code section skeleton */}
+            <div className="p-4 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-lg border-2 border-blue-200">
+              <div className="text-center space-y-3">
+                <div className="flex items-center justify-center gap-2">
+                  <Skeleton className="h-5 w-5" />
+                  <Skeleton className="h-5 w-40" />
+                </div>
+                <div className="bg-white p-3 rounded-lg inline-block shadow-sm">
+                  <Skeleton className="w-64 h-64" />
+                </div>
+                <div className="space-y-1">
+                  <Skeleton className="h-4 w-56 mx-auto" />
+                  <Skeleton className="h-3 w-48 mx-auto" />
+                </div>
+              </div>
+            </div>
+
+            {/* Payment button skeleton */}
+            <div className="space-y-2">
+              <Skeleton className="h-4 w-64" />
+              <Skeleton className="h-10 w-full" />
+            </div>
+          </CardContent>
+        </Card>
+      </main>
+    );
+  }
 
   console.log(
     "Rendering payment page. Player balance:",
