@@ -10,8 +10,9 @@ import { Badge } from "@/components/ui/badge";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Autocomplete, AutocompleteOption } from "@/components/ui/autocomplete";
 import { CurrencyInput } from "@/components/ui/currency-input";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/src/hooks/useAuth";
-import { ChevronDownIcon, ExternalLink } from "lucide-react";
+import { ExternalLink } from "lucide-react";
 
 type FundSummary = {
   currentBalance: number;
@@ -58,6 +59,7 @@ export default function FundPage() {
   const [pagination, setPagination] = useState<Pagination | null>(null);
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [msg, setMsg] = useState("");
+  const [isLoading, setIsLoading] = useState<boolean>(true);
 
   // players for the 'performed by' select
   const [players, setPlayers] = useState<Player[]>([]);
@@ -91,6 +93,7 @@ export default function FundPage() {
     const pin = getPin();
     if (!pin) return;
 
+    setIsLoading(true);
     try {
       // Build query parameters with filters and pagination
       const params = new URLSearchParams({ adminPin: pin });
@@ -121,6 +124,8 @@ export default function FundPage() {
       }
     } catch (error) {
       console.error("Error loading fund data:", error);
+    } finally {
+      setIsLoading(false);
     }
   }, [getPin, filterPlayerId, filterStartDate, filterEndDate, currentPage]);
 
@@ -177,12 +182,31 @@ export default function FundPage() {
       </div>
 
       {/* Fund Summary */}
-      {summary && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Tình Trạng Quỹ</CardTitle>
-          </CardHeader>
-          <CardContent>
+      <Card>
+        <CardHeader>
+          <CardTitle>Tình Trạng Quỹ</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {isLoading ? (
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="text-center space-y-2">
+                <Skeleton className="h-8 w-32 mx-auto" />
+                <Skeleton className="h-4 w-20 mx-auto" />
+              </div>
+              <div className="text-center space-y-2">
+                <Skeleton className="h-6 w-28 mx-auto" />
+                <Skeleton className="h-4 w-16 mx-auto" />
+              </div>
+              <div className="text-center space-y-2">
+                <Skeleton className="h-6 w-28 mx-auto" />
+                <Skeleton className="h-4 w-16 mx-auto" />
+              </div>
+              <div className="text-center space-y-2">
+                <Skeleton className="h-6 w-16 mx-auto" />
+                <Skeleton className="h-4 w-20 mx-auto" />
+              </div>
+            </div>
+          ) : summary ? (
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <div className="text-center">
                 <p className="text-3xl font-bold text-green-600">
@@ -209,9 +233,13 @@ export default function FundPage() {
                 <p className="text-sm text-gray-600">Giao Dịch</p>
               </div>
             </div>
-          </CardContent>
-        </Card>
-      )}
+          ) : (
+            <div className="text-center py-8">
+              <p className="text-gray-500">Không có dữ liệu quỹ</p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Negative Balance Warning */}
       {players.filter((p) => p.balance && p.balance < 0).length > 0 && (
@@ -384,7 +412,30 @@ export default function FundPage() {
         </CardHeader>
         <CardContent>
           <div className="space-y-3 max-h-[600px] overflow-y-auto">
-            {transactions.length === 0 ? (
+            {isLoading ? (
+              <div className="space-y-3">
+                {Array.from({ length: 5 }).map((_, index) => (
+                  <div
+                    key={index}
+                    className="flex items-start justify-between p-4 border rounded-lg bg-white shadow-sm"
+                  >
+                    <div className="flex-1 space-y-2">
+                      <div className="flex items-center gap-2">
+                        <Skeleton className="h-5 w-12" />
+                        <Skeleton className="h-4 w-20" />
+                        <Skeleton className="h-4 w-24" />
+                      </div>
+                      <Skeleton className="h-3 w-32" />
+                      <div className="flex items-center gap-4">
+                        <Skeleton className="h-3 w-24" />
+                        <Skeleton className="h-3 w-24" />
+                      </div>
+                      <Skeleton className="h-3 w-40" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : transactions.length === 0 ? (
               <p className="text-gray-500 text-center py-4">
                 Chưa có giao dịch nào
               </p>
@@ -511,43 +562,6 @@ export default function FundPage() {
       </Card>
 
       {msg && <p className="text-sm text-gray-600">{msg}</p>}
-
-      {/* Players List (accordion) */}
-      <details
-        open
-        className="bg-card text-card-foreground flex flex-col gap-6 rounded-xl border py-6 shadow-sm"
-      >
-        <summary className="px-6 cursor-pointer list-none flex items-center justify-between">
-          <div className="leading-none font-semibold">Số Dư Cầu Thủ</div>
-          <div className="text-sm text-muted-foreground">
-            <ChevronDownIcon />
-          </div>
-        </summary>
-        <div className="px-6">
-          {players.length === 0 ? (
-            <p className="text-gray-500 text-center py-4">Chưa có thành viên</p>
-          ) : (
-            <div className="space-y-2">
-              {players.map((p) => (
-                <div
-                  key={p.id}
-                  className="flex items-center justify-between p-3 border rounded-lg"
-                >
-                  <div>
-                    <div className="font-medium">{p.name}</div>
-                    {p.phone && (
-                      <div className="text-sm text-gray-600">{p.phone}</div>
-                    )}
-                  </div>
-                  <div className="text-right font-medium">
-                    {(p.balance ?? 0).toLocaleString("vi-VN")} VND
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      </details>
     </main>
   );
 }
