@@ -48,3 +48,31 @@ export async function GET(req: NextRequest) {
     );
   }
 }
+
+export async function POST(req: NextRequest) {
+  try {
+    const body = await req.json();
+    const name = (body?.name ?? "").trim();
+    const phone = (body?.phone ?? null) as string | null;
+
+    if (!name) {
+      return NextResponse.json({ error: "Tên là bắt buộc" }, { status: 400 });
+    }
+
+    const player = await prisma.player.create({
+      data: {
+        name,
+        phone: phone && phone.length > 0 ? phone : null,
+        balance: 0,
+      },
+      select: { id: true, name: true, phone: true },
+    });
+
+    return NextResponse.json({ player }, { status: 201 });
+  } catch (e: unknown) {
+    return NextResponse.json(
+      { error: e instanceof Error ? e.message : "Lỗi hệ thống" },
+      { status: 500 }
+    );
+  }
+}

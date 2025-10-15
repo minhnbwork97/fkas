@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { getDeviceId } from "@/src/lib/deviceFingerprint";
 import { toast } from "sonner";
+import { Input } from "@/components/ui/input";
 
 export default function MatchPaymentPage() {
   const params = useParams<{ matchId: string }>();
@@ -25,61 +26,67 @@ export default function MatchPaymentPage() {
   const [playerBalance, setPlayerBalance] = useState<number | null>(null);
   const [playerId, setPlayerId] = useState<string | null>(null);
   const [hasTransactions, setHasTransactions] = useState<boolean>(false);
+  const [phone, setPhone] = useState<string>("");
+  const [phoneChecked, setPhoneChecked] = useState<boolean>(false);
+  const [isLookingUpPhone, setIsLookingUpPhone] = useState<boolean>(false);
+  const [hasTriedResolve, setHasTriedResolve] = useState<boolean>(false);
+  const [isLoadingPaymentInfo, setIsLoadingPaymentInfo] =
+    useState<boolean>(false);
 
   useEffect(() => {
     const load = async () => {
       try {
         setIsLoading(true);
+        setError("");
         // Load match info
         const matchRes = await fetch(`/api/matches/${matchId}`);
         if (matchRes.ok) {
           const m = await matchRes.json();
           setMatchInfo({ dateTime: m.dateTime });
         }
-        // Find player from device
+        // Find player from device (best-effort)
         const deviceId = getDeviceId();
-        if (!deviceId) {
-          setError("Không xác định được cầu thủ trên thiết bị này.");
-          return;
+        let foundPlayerId: string | null = null;
+        if (deviceId) {
+          const playerRes = await fetch(`/api/device/${deviceId}/player`);
+          if (playerRes.ok) {
+            const playerData = await playerRes.json();
+            foundPlayerId = playerData.playerId as string;
+            setPlayerId(foundPlayerId);
+          }
         }
-        const playerRes = await fetch(`/api/device/${deviceId}/player`);
-        if (!playerRes.ok) {
-          setError("Không tìm thấy cầu thủ.");
-          return;
+        // Fetch player balance and transaction status (only if player known)
+        if (foundPlayerId) {
+          const playerDetailRes = await fetch(`/api/players/${foundPlayerId}`);
+          if (playerDetailRes.ok) {
+            const playerDetail = await playerDetailRes.json();
+            console.log("Player detail:", playerDetail);
+            setPlayerBalance(playerDetail.balance);
+            setHasTransactions(playerDetail.hasTransactions || false);
+          } else {
+            console.error(
+              "Failed to fetch player balance:",
+              playerDetailRes.status
+            );
+          }
         }
-        const playerData = await playerRes.json();
-        setPlayerId(playerData.playerId);
-
-        // Fetch player balance and transaction status
-        const playerDetailRes = await fetch(
-          `/api/players/${playerData.playerId}`
-        );
-        if (playerDetailRes.ok) {
-          const playerDetail = await playerDetailRes.json();
-          console.log("Player detail:", playerDetail);
-          setPlayerBalance(playerDetail.balance);
-          setHasTransactions(playerDetail.hasTransactions || false);
-        } else {
-          console.error(
-            "Failed to fetch player balance:",
-            playerDetailRes.status
+        // Load my settlement using deviceId (no admin pin) if available
+        if (deviceId) {
+          const myRes = await fetch(
+            `/api/matches/${matchId}/my-settlement?deviceId=${encodeURIComponent(
+              deviceId
+            )}`
           );
-        }
-        // Load my settlement using deviceId (no admin pin)
-        const myRes = await fetch(
-          `/api/matches/${matchId}/my-settlement?deviceId=${encodeURIComponent(
-            deviceId
-          )}`
-        );
-        if (myRes.ok) {
-          const d = await myRes.json();
-          console.log({ d });
-          if (d.hasSettlement)
-            setMySettlement({
-              amount: d.amount,
-              paid: d.paid,
-              qrCodeUrl: d.qrCodeUrl,
-            });
+          if (myRes.ok) {
+            const d = await myRes.json();
+            console.log({ d });
+            if (d.hasSettlement)
+              setMySettlement({
+                amount: d.amount,
+                paid: d.paid,
+                qrCodeUrl: d.qrCodeUrl,
+              });
+          }
         }
       } catch {
         setError("Lỗi tải dữ liệu.");
@@ -89,6 +96,83 @@ export default function MatchPaymentPage() {
     };
     if (matchId) load();
   }, [matchId]);
+
+  // Debounced phone lookup when device recognition didn't resolve player
+  useEffect(() => {
+    if (playerId) return; // already identified via device
+    const trimmed = phone.trim();
+    if (!trimmed) {
+      setPhoneChecked(false);
+      return;
+    }
+
+    const handler = setTimeout(async () => {
+      if (trimmed.length < 8) {
+        setPhoneChecked(false);
+        return;
+      }
+      try {
+        setIsLookingUpPhone(true);
+        // Step 1: resolve player by phone
+        const p = await fetch(
+          `/api/players/by-phone?phone=${encodeURIComponent(trimmed)}`
+        );
+        setPhoneChecked(true);
+        if (!p.ok) {
+          setPlayerId(null);
+          setPlayerBalance(null);
+          setHasTransactions(false);
+          setMySettlement(null);
+          return;
+        }
+        const pd = await p.json();
+        if (!pd?.player?.id) {
+          setPlayerId(null);
+          setPlayerBalance(null);
+          setHasTransactions(false);
+          setMySettlement(null);
+          return;
+        }
+        const resolvedPlayerId = pd.player.id as string;
+        setPlayerId(resolvedPlayerId);
+
+        // Step 2 & 3: fetch player balance and then settlement + QR with loading state
+        setIsLoadingPaymentInfo(true);
+        try {
+          const detail = await fetch(`/api/players/${resolvedPlayerId}`);
+          if (detail.ok) {
+            const det = await detail.json();
+            setPlayerBalance(det.balance);
+            setHasTransactions(det.hasTransactions || false);
+          }
+
+          const r = await fetch(
+            `/api/matches/${matchId}/my-settlement?phone=${encodeURIComponent(
+              trimmed
+            )}`
+          );
+          const d = await r.json();
+          if (r.ok && d?.hasSettlement) {
+            setMySettlement({
+              amount: d.amount,
+              paid: d.paid,
+              qrCodeUrl: d.qrCodeUrl,
+            });
+          } else {
+            setMySettlement(null);
+          }
+        } finally {
+          setIsLoadingPaymentInfo(false);
+        }
+      } catch {
+      } finally {
+        setIsLookingUpPhone(false);
+        setHasTriedResolve(true);
+      }
+    }, 500);
+
+    return () => clearTimeout(handler);
+  }, [phone, playerId, matchId]);
 
   const handleSelfReportPayment = async () => {
     if (!mySettlement || mySettlement.paid) return;
@@ -224,7 +308,58 @@ export default function MatchPaymentPage() {
             </p>
           )}
           {error && <p className="text-sm text-red-600">{error}</p>}
-          {mySettlement ? (
+          {!playerId && (
+            <div className="">
+              <Input
+                type="tel"
+                value={phone}
+                onChange={(e) => {
+                  setPhone(e.target.value);
+                  setPhoneChecked(false);
+                }}
+                placeholder="Nhập số điện thoại của bạn"
+              />
+              {isLookingUpPhone && (
+                <p className="text-xs text-gray-600 mt-2">
+                  Đang kiểm tra số điện thoại...
+                </p>
+              )}
+              {phoneChecked && !mySettlement && (
+                <p className="text-xs text-gray-600 mt-2">
+                  Không tìm thấy thông tin thanh toán cho số điện thoại này.
+                </p>
+              )}
+            </div>
+          )}
+          {isLoadingPaymentInfo ? (
+            <div className="space-y-3">
+              <div className="p-3 bg-gray-50 rounded border">
+                <div className="flex justify-between">
+                  <span>Số tiền cần đóng</span>
+                  <span className="font-semibold">...</span>
+                </div>
+                <div className="mt-1 text-gray-500 text-sm">Đang tải...</div>
+              </div>
+
+              <div className="p-3 bg-blue-50 rounded border border-blue-200">
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-blue-900">
+                    Số dư quỹ hiện tại
+                  </span>
+                  <span className="font-semibold text-blue-700">...</span>
+                </div>
+              </div>
+
+              <div className="p-4 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-lg border-2 border-blue-200">
+                <div className="text-center space-y-3">
+                  <div className="bg-white p-3 rounded-lg inline-block shadow-sm">
+                    <div className="w-64 h-64 mx-auto bg-gray-100 animate-pulse" />
+                  </div>
+                  <div className="text-sm text-blue-800">Đang tạo mã QR...</div>
+                </div>
+              </div>
+            </div>
+          ) : mySettlement ? (
             <div className="space-y-3">
               <div className="p-3 bg-gray-50 rounded border">
                 <div className="flex justify-between">
@@ -346,11 +481,9 @@ export default function MatchPaymentPage() {
                 </div>
               )}
             </div>
-          ) : (
-            <p className="text-sm text-gray-600">
-              Không tìm thấy thông tin thanh toán cho bạn.
-            </p>
-          )}
+          ) : hasTriedResolve && !phoneChecked ? (
+            <p className="text-sm text-gray-600"></p>
+          ) : null}
         </CardContent>
       </Card>
     </main>

@@ -13,27 +13,46 @@ export async function GET(
   try {
     const { matchId } = await context.params;
     const deviceId = req.nextUrl.searchParams.get("deviceId");
-    if (!deviceId) {
-      return NextResponse.json({ error: "deviceId required" }, { status: 400 });
-    }
-
-    // Resolve player for deviceId via latest approved request
-    const approved = await prisma.pendingRosterRequest.findFirst({
-      where: { deviceId, status: "Approved" },
-      orderBy: { createdAt: "desc" },
-      select: { name: true, phone: true },
-    });
-    if (!approved) {
+    const phone = req.nextUrl.searchParams.get("phone");
+    if (!deviceId && !phone) {
       return NextResponse.json(
-        { error: "Không tìm thấy cầu thủ" },
-        { status: 404 }
+        { error: "deviceId or phone required" },
+        { status: 400 }
       );
     }
 
-    const player = await prisma.player.findFirst({
-      where: { name: approved.name, phone: approved.phone },
-      select: { id: true, name: true },
-    });
+    // Resolve player either by phone directly or via device binding
+    let player: { id: string; name: string } | null = null;
+    if (phone) {
+      const found = await prisma.player.findFirst({
+        where: { phone },
+        select: { id: true, name: true },
+      });
+      if (!found) {
+        return NextResponse.json(
+          { error: "Không tìm thấy cầu thủ với số điện thoại này" },
+          { status: 404 }
+        );
+      }
+      player = found;
+    } else if (deviceId) {
+      const approved = await prisma.pendingRosterRequest.findFirst({
+        where: { deviceId, status: "Approved" },
+        orderBy: { createdAt: "desc" },
+        select: { name: true, phone: true },
+      });
+      if (!approved) {
+        return NextResponse.json(
+          { error: "Không tìm thấy cầu thủ" },
+          { status: 404 }
+        );
+      }
+      const found = await prisma.player.findFirst({
+        where: { name: approved.name, phone: approved.phone },
+        select: { id: true, name: true },
+      });
+      player = found;
+    }
     if (!player) {
       return NextResponse.json(
         { error: "Không tìm thấy cầu thủ" },

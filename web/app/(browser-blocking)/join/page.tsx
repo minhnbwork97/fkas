@@ -57,6 +57,10 @@ export default function JoinPage() {
       setMsg("Vui lòng nhập tên");
       return;
     }
+    if (!phone.trim()) {
+      setMsg("Vui lòng nhập số điện thoại");
+      return;
+    }
 
     setMsg("Đang gửi yêu cầu...");
 
@@ -68,7 +72,7 @@ export default function JoinPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name: name.trim(),
-          phone: phone.trim() || null,
+          phone: phone.trim(),
           deviceId: deviceId,
         }),
       });
@@ -294,13 +298,14 @@ export default function JoinPage() {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="phone">Số điện thoại</Label>
+            <Label htmlFor="phone">Số điện thoại *</Label>
             <Input
               id="phone"
               type="tel"
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
-              placeholder="Nhập số điện thoại (tùy chọn)"
+              placeholder="Nhập số điện thoại của bạn"
+              required
             />
           </div>
 

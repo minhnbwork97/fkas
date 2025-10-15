@@ -19,7 +19,12 @@ export const MatchAttendance: React.FC = () => {
   );
 
   const [playerId, setPlayerId] = useState<string>("");
-  // device recognition: find player via deviceId or redirect to join
+  const [playerName, setPlayerName] = useState<string>("");
+  const [phone, setPhone] = useState<string>("");
+  const [phoneChecked, setPhoneChecked] = useState<boolean>(false);
+  const [needName, setNeedName] = useState<boolean>(false);
+  const [isLookingUpPhone, setIsLookingUpPhone] = useState<boolean>(false);
+  // device recognition: find player via deviceId or fall back to phone flow
   useEffect(() => {
     const loadPlayerInfo = async () => {
       try {
@@ -33,21 +38,16 @@ export const MatchAttendance: React.FC = () => {
             setResult(`Chào mừng ${data.name}! Bạn đã được nhận diện tự động.`);
             setTimeout(() => setResult(""), 3000);
           } else {
-            // No player found via deviceId, redirect to join page
-            setIsRedirecting(true);
-            window.location.href = "/join";
-            return;
+            // Not recognized by device; require phone lookup
+            setPhoneChecked(false);
           }
         } else {
-          // No deviceId, redirect to join page
-          setIsRedirecting(true);
-          window.location.href = "/join";
-          return;
+          // No deviceId; require phone lookup
+          setPhoneChecked(false);
         }
       } catch (error) {
-        console.log("No device binding found, redirecting to join");
-        setIsRedirecting(true);
-        window.location.href = "/join";
+        console.log("No device binding found; fallback to phone lookup");
+        setPhoneChecked(false);
       }
     };
 
@@ -64,7 +64,7 @@ export const MatchAttendance: React.FC = () => {
   };
 
   // Function to refresh all page data
-  const refreshPageData = async () => {
+  const refreshPageData = async (overridePlayerId?: string) => {
     try {
       setIsRefreshing(true);
 
@@ -78,9 +78,10 @@ export const MatchAttendance: React.FC = () => {
       }
 
       // Check if player's attendance status has changed
-      if (playerId) {
+      const idToUse = overridePlayerId || playerId;
+      if (idToUse) {
         const playerRes = await fetch(
-          `/api/matches/${matchId}/player-attendance?playerId=${playerId}`
+          `/api/matches/${matchId}/player-attendance?playerId=${idToUse}`
         );
         if (playerRes.ok) {
           const playerData = await playerRes.json();
@@ -110,7 +111,6 @@ export const MatchAttendance: React.FC = () => {
   const [isLate, setIsLate] = useState<boolean>(false);
   const [note, setNote] = useState<string>("");
   const [result, setResult] = useState<string>("");
-  const [playerName, setPlayerName] = useState<string>("");
   const [matchInfo, setMatchInfo] = useState<{
     dateTime: string;
     type: string;
@@ -216,6 +216,52 @@ export const MatchAttendance: React.FC = () => {
   // Do not render anything until match status check completes to avoid UI flash
   // no client-side redirect gate; server layout handles payment redirect
 
+  // Debounced phone lookup flow when user finishes typing phone number
+  useEffect(() => {
+    if (playerId) return; // already identified
+    const trimmed = phone.trim();
+    if (!trimmed) {
+      setPhoneChecked(false);
+      setNeedName(false);
+      return;
+    }
+
+    const handler = setTimeout(async () => {
+      // Basic guard to reduce unnecessary calls for very short numbers
+      if (trimmed.length < 8) {
+        setPhoneChecked(false);
+        setNeedName(false);
+        return;
+      }
+      try {
+        setIsLookingUpPhone(true);
+        const r = await fetch(
+          `/api/players/by-phone?phone=${encodeURIComponent(trimmed)}`
+        );
+        setPhoneChecked(true);
+        if (r.ok) {
+          const d = await r.json();
+          if (d?.player?.id) {
+            setPlayerId(d.player.id);
+            setPlayerName(d.player.name || "");
+            setNeedName(false);
+            toast.success(`Đã tìm thấy: ${d.player.name || "Cầu thủ"}`);
+          } else {
+            setNeedName(true);
+          }
+        } else {
+          setNeedName(true);
+        }
+      } catch {
+        setNeedName(true);
+      } finally {
+        setIsLookingUpPhone(false);
+      }
+    }, 500);
+
+    return () => clearTimeout(handler);
+  }, [phone, playerId]);
+
   // Check for existing attendance when playerId is available (after status check)
   useEffect(() => {
     if (!playerId || !matchId) return;
@@ -283,6 +329,41 @@ export const MatchAttendance: React.FC = () => {
       return;
     }
 
+    // Ensure we have a player; create one if needed using phone+name
+    let effectivePlayerId = playerId;
+    if (!effectivePlayerId) {
+      if (!phone.trim()) {
+        toast.error("Vui lòng nhập số điện thoại");
+        return;
+      }
+      if (!playerName.trim()) {
+        toast.error("Vui lòng nhập tên");
+        return;
+      }
+      try {
+        const createRes = await fetch(`/api/players`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            name: playerName.trim(),
+            phone: phone.trim(),
+          }),
+        });
+        if (createRes.ok) {
+          const d = await createRes.json();
+          effectivePlayerId = d.player.id as string;
+          setPlayerId(effectivePlayerId);
+        } else {
+          const err = await createRes.json().catch(() => ({}));
+          toast.error(err.error || "Không thể tạo tài khoản cầu thủ");
+          return;
+        }
+      } catch (e) {
+        toast.error("Lỗi kết nối khi tạo tài khoản");
+        return;
+      }
+    }
+
     setIsSubmitting(true);
     setResult("Đang gửi...");
 
@@ -291,7 +372,7 @@ export const MatchAttendance: React.FC = () => {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          playerId,
+          playerId: effectivePlayerId,
           status,
           isLate: isLate, // This is for "will arrive late to match" - user's choice
           note,
@@ -318,13 +399,13 @@ export const MatchAttendance: React.FC = () => {
       toast.success(successMessage + lateSubmissionMessage);
 
       try {
-        localStorage.setItem("fkas_player_id", playerId);
+        localStorage.setItem("fkas_player_id", effectivePlayerId);
       } catch {}
 
       // persist current selection
       try {
-        if (playerId) {
-          const key = `fkas_prev_${playerId}`;
+        if (effectivePlayerId) {
+          const key = `fkas_prev_${effectivePlayerId}`;
           localStorage.setItem(
             key,
             JSON.stringify({ status, guestCount, isLate, note })
@@ -333,7 +414,7 @@ export const MatchAttendance: React.FC = () => {
       } catch {}
 
       // Refresh all page data to reflect the latest state
-      await refreshPageData();
+      await refreshPageData(effectivePlayerId);
     } catch (error) {
       setResult("Lỗi kết nối. Vui lòng thử lại.");
     } finally {
@@ -346,20 +427,7 @@ export const MatchAttendance: React.FC = () => {
     <div className={`animate-pulse bg-gray-200 rounded ${className}`}></div>
   );
 
-  if (isRedirecting) {
-    return (
-      <main className="max-w-xl mx-auto p-4 sm:p-6 space-y-4 sm:space-y-6">
-        <h1 className="text-xl sm:text-2xl font-semibold">
-          Điểm Danh Trận Đấu
-        </h1>
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-center">
-          <p className="text-blue-800">
-            Đang chuyển hướng đến trang tham gia...
-          </p>
-        </div>
-      </main>
-    );
-  }
+  // No longer redirecting to join; inline phone/name flow instead
 
   if (isLoading) {
     return (
@@ -515,6 +583,51 @@ export const MatchAttendance: React.FC = () => {
           </div>
         </div>
       )}
+      {!playerId && (
+        <div className="bg-white border border-gray-200 rounded-lg p-4 sm:p-5 space-y-3 sm:space-y-4">
+          <h2 className="text-base sm:text-lg font-semibold text-gray-900">
+            Xác Nhận Danh Tính
+          </h2>
+          <div className="space-y-2">
+            <Label className="text-sm sm:text-base">Số Điện Thoại</Label>
+            <Input
+              type="tel"
+              value={phone}
+              onChange={(e) => {
+                setPhone(e.target.value);
+                setPhoneChecked(false);
+                setNeedName(false);
+                setPlayerId("");
+                setPlayerName("");
+              }}
+              placeholder="Ví dụ: 0912345678"
+              className="text-base"
+              style={{ fontSize: "16px" }}
+            />
+            {isLookingUpPhone && (
+              <p className="text-xs text-gray-600">
+                Đang kiểm tra số điện thoại...
+              </p>
+            )}
+          </div>
+          {phoneChecked && !playerId && (
+            <div className="space-y-2">
+              <Label className="text-sm sm:text-base">Tên</Label>
+              <Input
+                type="text"
+                value={playerName}
+                onChange={(e) => setPlayerName(e.target.value)}
+                placeholder="Nhập tên của bạn"
+                className="text-base"
+                style={{ fontSize: "16px" }}
+              />
+              <p className="text-xs text-gray-600">
+                Vui lòng nhập tên sau đó tiếp tục điểm danh.
+              </p>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Attendance Form - Priority 3 (Main Content) */}
       <div className="bg-white border border-gray-200 rounded-lg p-4 sm:p-5 space-y-3 sm:space-y-4">
@@ -666,7 +779,9 @@ export const MatchAttendance: React.FC = () => {
         <Button
           onClick={submit}
           disabled={
-            !playerId || !playerName || isSubmitting || isAttendanceDisabled
+            (!playerId && (!phone.trim() || !playerName.trim())) ||
+            isSubmitting ||
+            isAttendanceDisabled
           }
           className="w-full text-sm sm:text-base py-3"
         >
