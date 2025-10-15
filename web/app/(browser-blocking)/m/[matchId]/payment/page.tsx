@@ -213,7 +213,6 @@ export default function MatchPaymentPage() {
 
   return (
     <main className="max-w-xl mx-auto p-6 space-y-4">
-      <BrowserWarning />
       <Card>
         <CardHeader>
           <CardTitle>Thanh Toán Sau Trận Đấu</CardTitle>
