@@ -3,7 +3,9 @@
  * that may cause issues with payment flows
  */
 
-// Type definitions for webkit APIs
+import { detectIncognito } from "detectincognitojs";
+
+// Type definitions for webkit APIs (kept for potential future use)
 interface WebkitFileSystem {
   name: string;
   root: unknown;
@@ -58,47 +60,16 @@ function detectZaloBrowser(userAgent: string): boolean {
 }
 
 /**
- * Detects if the browser is in incognito/private mode
- * This is a best-effort detection as browsers actively try to prevent this
+ * Detects if the browser is in incognito/private mode using detectIncognito.js
+ * This is much more reliable than our custom implementation
  */
 async function detectIncognitoMode(): Promise<boolean> {
   try {
-    // Method 1: Check for storage quota
-    if ("storage" in navigator && "estimate" in navigator.storage) {
-      // In incognito mode, storage quota is typically much lower
-      const estimate = await navigator.storage.estimate();
-      return (estimate.quota || 0) < 120000000; // Less than 120MB suggests incognito
-    }
-
-    // Method 2: Check for indexedDB availability
-    if (!window.indexedDB) {
-      return true;
-    }
-
-    // Method 3: Check for webkitRequestFileSystem (deprecated but still works in some browsers)
-    const webkitWindow = window as WebkitWindow;
-    if (webkitWindow.webkitRequestFileSystem) {
-      return new Promise<boolean>((resolve) => {
-        webkitWindow.webkitRequestFileSystem!(
-          webkitWindow.TEMPORARY || 0,
-          1,
-          () => resolve(false), // Success means not incognito
-          () => resolve(true) // Error means likely incognito
-        );
-      });
-    }
-
-    // Method 4: Check for specific incognito indicators
-    const userAgent = navigator.userAgent;
-    const incognitoPatterns = [/Private/i, /Incognito/i, /InPrivate/i];
-
-    if (incognitoPatterns.some((pattern) => pattern.test(userAgent))) {
-      return true;
-    }
-
-    return false;
-  } catch {
-    // If we can't determine, assume not incognito to avoid false positives
+    const result = await detectIncognito();
+    return result.isPrivate;
+  } catch (error) {
+    console.error("Error detecting incognito mode:", error);
+    // If detection fails, assume not incognito to avoid false positives
     return false;
   }
 }
