@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
-import { Autocomplete, AutocompleteOption } from "@/components/ui/autocomplete";
+import { AutocompleteOption } from "@/components/ui/autocomplete";
 
 const PIN_KEY = "fkas_admin_pin";
 
@@ -268,7 +268,7 @@ export default function SettlementPage() {
         );
       }
     }
-  }, [attendance, customParticipants, summary?.fieldCost]); // Don't include summary to avoid infinite loop
+  }, [attendance, customParticipants, summary?.fieldCost, summary]); // Include summary to fix dependency warning
 
   // Auto-calculate settlement on initial page load
   useEffect(() => {
@@ -289,6 +289,7 @@ export default function SettlementPage() {
     attendance.length,
     summary,
     isLoadingSettlement,
+    calculateSummary,
   ]);
 
   async function calculateSummary() {
@@ -590,13 +591,20 @@ export default function SettlementPage() {
             const customData = await customRes.json();
             if (Array.isArray(customData.items)) {
               setCustomParticipants(
-                customData.items.map((item: any) => ({
-                  id: item.id,
-                  name: item.name,
-                  guestCount: item.guestCount || 0,
-                  isExistingPlayer: !!item.playerId, // True if has playerId
-                  playerId: item.playerId || undefined,
-                }))
+                customData.items.map(
+                  (item: {
+                    id: string;
+                    name: string;
+                    guestCount: number;
+                    playerId?: string;
+                  }) => ({
+                    id: item.id,
+                    name: item.name,
+                    guestCount: item.guestCount || 0,
+                    isExistingPlayer: !!item.playerId, // True if has playerId
+                    playerId: item.playerId || undefined,
+                  })
+                )
               );
             }
           }
@@ -652,7 +660,7 @@ export default function SettlementPage() {
       if (response.ok) {
         const data = await response.json();
         const playerOptions: AutocompleteOption[] = data.players.map(
-          (player: any) => ({
+          (player: { id: string; name: string; phone?: string }) => ({
             value: player.id,
             label: player.name,
             secondary: player.phone ? `SĐT: ${player.phone}` : undefined,
@@ -984,7 +992,8 @@ export default function SettlementPage() {
                           <div className="flex items-center gap-2">
                             <span className="text-blue-600">+</span>
                             <span>
-                              Thêm "{participantInput}" làm người tham gia mới
+                              Thêm &quot;{participantInput}&quot; làm người tham
+                              gia mới
                             </span>
                           </div>
                         </button>
