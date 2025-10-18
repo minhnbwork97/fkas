@@ -119,45 +119,87 @@ export async function POST(
       }
     }
 
-    // Ensure custom participants exist per match in CustomAttendee
+    // Process custom participants - separate existing players from true custom attendees
+    const existingPlayerParticipants: Array<{
+      playerId: string;
+      name: string;
+      guestCount: number;
+    }> = [];
     const customRecords: Array<{
       id: string;
       name: string;
       guestCount: number;
     }> = [];
+
     if (Array.isArray(customParticipants) && customParticipants.length > 0) {
       for (const cp of customParticipants as Array<{
         tempId: string;
         name: string;
         guestCount: number;
+        isExistingPlayer?: boolean;
+        playerId?: string;
       }>) {
-        let rec = await prisma.customAttendee.findFirst({
-          where: { matchId, name: cp.name },
-        });
-        if (!rec) {
-          rec = await prisma.customAttendee.create({
-            data: { matchId, name: cp.name, guestCount: cp.guestCount || 0 },
+        if (cp.isExistingPlayer && cp.playerId) {
+          // This is an existing player added to custom list
+          existingPlayerParticipants.push({
+            playerId: cp.playerId,
+            name: cp.name,
+            guestCount: cp.guestCount || 0,
           });
-        } else if ((rec.guestCount || 0) !== (cp.guestCount || 0)) {
-          rec = await prisma.customAttendee.update({
-            where: { id: rec.id },
-            data: { guestCount: cp.guestCount || 0 },
+
+          // Also save to CustomAttendee table for persistence
+          let rec = await prisma.customAttendee.findFirst({
+            where: { matchId, name: cp.name, playerId: cp.playerId },
+          });
+          if (!rec) {
+            rec = await prisma.customAttendee.create({
+              data: {
+                matchId,
+                name: cp.name,
+                guestCount: cp.guestCount || 0,
+                playerId: cp.playerId, // Store the playerId for existing players
+              },
+            });
+          } else if ((rec.guestCount || 0) !== (cp.guestCount || 0)) {
+            rec = await prisma.customAttendee.update({
+              where: { id: rec.id },
+              data: { guestCount: cp.guestCount || 0 },
+            });
+          }
+        } else {
+          // This is a true custom attendee
+          let rec = await prisma.customAttendee.findFirst({
+            where: { matchId, name: cp.name },
+          });
+          if (!rec) {
+            rec = await prisma.customAttendee.create({
+              data: { matchId, name: cp.name, guestCount: cp.guestCount || 0 },
+            });
+          } else if ((rec.guestCount || 0) !== (cp.guestCount || 0)) {
+            rec = await prisma.customAttendee.update({
+              where: { id: rec.id },
+              data: { guestCount: cp.guestCount || 0 },
+            });
+          }
+          customRecords.push({
+            id: rec.id,
+            name: rec.name,
+            guestCount: rec.guestCount,
           });
         }
-        customRecords.push({
-          id: rec.id,
-          name: rec.name,
-          guestCount: rec.guestCount,
-        });
       }
     }
 
-    // Get player details for actual attendees (members only)
+    // Get player details for actual attendees (members only) + existing player participants
+    const allPlayerIds = [
+      ...actualAttendees,
+      ...existingPlayerParticipants.map((p) => p.playerId),
+    ];
     const attendees = await prisma.player.findMany({
-      where: { id: { in: actualAttendees } },
+      where: { id: { in: allPlayerIds } },
     });
 
-    if (attendees.length !== actualAttendees.length) {
+    if (attendees.length !== allPlayerIds.length) {
       return NextResponse.json(
         { error: "Một số cầu thủ không tồn tại" },
         { status: 400 }
@@ -207,15 +249,28 @@ export async function POST(
       }
     }
 
+    // Add guest counts for existing player participants
+    for (const participant of existingPlayerParticipants) {
+      guestsByPlayer.set(
+        participant.playerId,
+        Math.max(0, participant.guestCount || 0)
+      );
+    }
+
     // Calculate counts for summary (prefer client total which includes guests/custom)
     const customGuests = (customRecords || []).reduce(
+      (sum: number, p: { guestCount: number }) => sum + (p.guestCount || 0),
+      0
+    );
+    const existingPlayerGuests = existingPlayerParticipants.reduce(
       (sum: number, p: { guestCount: number }) => sum + (p.guestCount || 0),
       0
     );
     const computedWithGuests =
       attendees.length +
       Array.from(guestsByPlayer.values()).reduce((s, n) => s + n, 0) +
-      customGuests;
+      customGuests +
+      existingPlayerGuests;
     const totalAttended = Math.max(
       totalAttendedFromClient ?? computedWithGuests,
       1
@@ -252,6 +307,48 @@ export async function POST(
           paid: settlement.paid,
         });
       }
+
+      // Create settlements for existing player participants
+      for (const participant of existingPlayerParticipants) {
+        const guestCount = guestsByPlayer.get(participant.playerId) ?? 0;
+
+        // Check if settlement already exists for this player
+        const existingSettlement = await prisma.settlement.findFirst({
+          where: {
+            matchId: matchId,
+            playerId: participant.playerId,
+          },
+        });
+
+        let settlement;
+        if (existingSettlement) {
+          // Update existing settlement
+          settlement = await prisma.settlement.update({
+            where: { id: existingSettlement.id },
+            data: {
+              amount: perPersonCost * (1 + guestCount),
+            },
+          });
+        } else {
+          // Create new settlement
+          settlement = await prisma.settlement.create({
+            data: {
+              matchId: matchId,
+              playerId: participant.playerId,
+              amount: perPersonCost * (1 + guestCount),
+              paid: false,
+            },
+          });
+        }
+
+        settlements.push({
+          playerId: participant.playerId,
+          playerName: participant.name,
+          amount: perPersonCost * (1 + guestCount),
+          paid: settlement.paid,
+        });
+      }
+
       // Create settlements for custom attendees
       for (const ca of customRecords) {
         const settlement = await prisma.settlement.create({
@@ -314,6 +411,47 @@ export async function POST(
           settlements.push({
             playerId: player.id,
             playerName: player.name,
+            amount: perPersonCost * (1 + guestCount),
+            paid: settlement.paid,
+          });
+        }
+
+        // Create settlements for existing player participants
+        for (const participant of existingPlayerParticipants) {
+          const guestCount = guestsByPlayer.get(participant.playerId) ?? 0;
+
+          // Check if settlement already exists for this player
+          const existingSettlement = await prisma.settlement.findFirst({
+            where: {
+              matchId: matchId,
+              playerId: participant.playerId,
+            },
+          });
+
+          let settlement;
+          if (existingSettlement) {
+            // Update existing settlement
+            settlement = await prisma.settlement.update({
+              where: { id: existingSettlement.id },
+              data: {
+                amount: perPersonCost * (1 + guestCount),
+              },
+            });
+          } else {
+            // Create new settlement
+            settlement = await prisma.settlement.create({
+              data: {
+                matchId: matchId,
+                playerId: participant.playerId,
+                amount: perPersonCost * (1 + guestCount),
+                paid: false,
+              },
+            });
+          }
+
+          settlements.push({
+            playerId: participant.playerId,
+            playerName: participant.name,
             amount: perPersonCost * (1 + guestCount),
             paid: settlement.paid,
           });

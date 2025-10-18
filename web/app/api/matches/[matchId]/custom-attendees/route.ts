@@ -27,7 +27,12 @@ export async function GET(
     const items = await prisma.customAttendee.findMany({
       where: { matchId },
       orderBy: { createdAt: "asc" },
-      select: { id: true, name: true, guestCount: true },
+      select: {
+        id: true,
+        name: true,
+        guestCount: true,
+        playerId: true,
+      },
     });
 
     return NextResponse.json({ items }, { status: 200 });

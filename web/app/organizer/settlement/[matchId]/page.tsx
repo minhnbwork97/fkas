@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
+import { Autocomplete, AutocompleteOption } from "@/components/ui/autocomplete";
 
 const PIN_KEY = "fkas_admin_pin";
 
@@ -53,9 +54,19 @@ export default function SettlementPage() {
   const [isConfirmingSettlement, setIsConfirmingSettlement] = useState(false);
   const [matchStatus, setMatchStatus] = useState<string>("");
   const [customParticipants, setCustomParticipants] = useState<
-    Array<{ id: string; name: string; guestCount: number }>
+    Array<{
+      id: string;
+      name: string;
+      guestCount: number;
+      isExistingPlayer?: boolean;
+      playerId?: string;
+    }>
   >([]);
-  const [newCustomName, setNewCustomName] = useState<string>("");
+  const [participantInput, setParticipantInput] = useState<string>("");
+  const [availablePlayers, setAvailablePlayers] = useState<
+    AutocompleteOption[]
+  >([]);
+  const [isLoadingPlayers, setIsLoadingPlayers] = useState(false);
   const [hasAutoCalculated, setHasAutoCalculated] = useState(false);
   const [isDataLoaded, setIsDataLoaded] = useState(false);
 
@@ -200,10 +211,13 @@ export default function SettlementPage() {
                             id: string;
                             name: string;
                             guestCount: number;
+                            playerId?: string;
                           }) => ({
                             id: x.id,
                             name: x.name,
                             guestCount: x.guestCount || 0,
+                            isExistingPlayer: !!x.playerId,
+                            playerId: x.playerId || undefined,
                           })
                         )
                       );
@@ -215,6 +229,9 @@ export default function SettlementPage() {
                   // Mark data as loaded after all initial data fetches are complete
                   setIsDataLoaded(true);
                 });
+
+              // Load available players for autocomplete
+              loadAvailablePlayers();
             }
           })
           .catch(() => {});
@@ -331,6 +348,8 @@ export default function SettlementPage() {
             tempId: p.id,
             name: p.name,
             guestCount: p.guestCount,
+            isExistingPlayer: p.isExistingPlayer,
+            playerId: p.playerId,
           })),
         }),
       });
@@ -558,6 +577,32 @@ export default function SettlementPage() {
         } catch (error) {
           console.error("Error reloading settlements:", error);
         }
+
+        // Reload custom participants to maintain the list
+        try {
+          const pin = localStorage.getItem(PIN_KEY) || "";
+          const customRes = await fetch(
+            `/api/matches/${matchId}/custom-attendees?adminPin=${encodeURIComponent(
+              pin
+            )}`
+          );
+          if (customRes.ok) {
+            const customData = await customRes.json();
+            if (Array.isArray(customData.items)) {
+              setCustomParticipants(
+                customData.items.map((item: any) => ({
+                  id: item.id,
+                  name: item.name,
+                  guestCount: item.guestCount || 0,
+                  isExistingPlayer: !!item.playerId, // True if has playerId
+                  playerId: item.playerId || undefined,
+                }))
+              );
+            }
+          }
+        } catch (error) {
+          console.error("Failed to reload custom participants:", error);
+        }
       } else {
         setMsg(data.error || "Có lỗi xảy ra khi xác nhận thanh toán");
       }
@@ -594,17 +639,76 @@ export default function SettlementPage() {
     setSummary(null);
   }
 
-  function addCustomParticipant() {
-    if (!newCustomName.trim()) return;
+  // Load available players for autocomplete
+  const loadAvailablePlayers = async () => {
+    const pin = localStorage.getItem(PIN_KEY);
+    if (!pin) return;
 
-    const newParticipant = {
-      id: `custom_${Date.now()}`,
-      name: newCustomName.trim(),
-      guestCount: 0,
-    };
+    setIsLoadingPlayers(true);
+    try {
+      const response = await fetch(
+        `/api/players?adminPin=${encodeURIComponent(pin)}`
+      );
+      if (response.ok) {
+        const data = await response.json();
+        const playerOptions: AutocompleteOption[] = data.players.map(
+          (player: any) => ({
+            value: player.id,
+            label: player.name,
+            secondary: player.phone ? `SĐT: ${player.phone}` : undefined,
+          })
+        );
+        setAvailablePlayers(playerOptions);
+      }
+    } catch (error) {
+      console.error("Failed to load players:", error);
+    } finally {
+      setIsLoadingPlayers(false);
+    }
+  };
 
-    setCustomParticipants((prev) => [...prev, newParticipant]);
-    setNewCustomName("");
+  function addParticipant() {
+    if (!participantInput.trim()) return;
+
+    // Check if input matches an existing player (by ID or name)
+    const existingPlayer = availablePlayers.find(
+      (p) =>
+        p.value === participantInput.trim() ||
+        p.label.toLowerCase() === participantInput.trim().toLowerCase()
+    );
+
+    if (existingPlayer) {
+      // Add existing player
+      const isAlreadyAdded = customParticipants.some(
+        (p) => p.playerId === existingPlayer.value
+      );
+      if (isAlreadyAdded) {
+        setMsg("Cầu thủ này đã được thêm vào danh sách");
+        return;
+      }
+
+      const newParticipant = {
+        id: `player_${existingPlayer.value}`,
+        name: existingPlayer.label,
+        guestCount: 0,
+        isExistingPlayer: true,
+        playerId: existingPlayer.value,
+      };
+
+      setCustomParticipants((prev) => [...prev, newParticipant]);
+    } else {
+      // Add new custom participant
+      const newParticipant = {
+        id: `custom_${Date.now()}`,
+        name: participantInput.trim(),
+        guestCount: 0,
+        isExistingPlayer: false,
+      };
+
+      setCustomParticipants((prev) => [...prev, newParticipant]);
+    }
+
+    setParticipantInput("");
     setSummary(null);
   }
 
@@ -819,20 +923,86 @@ export default function SettlementPage() {
 
           {/* Custom Participants Section */}
           <div className="mt-6 pt-4 border-t">
-            <h3 className="font-medium mb-3">Thêm Người Tham Gia Tùy Chỉnh</h3>
+            <h3 className="font-medium mb-3">Danh Sách Tham Gia Tùy Chỉnh</h3>
 
-            {/* Add Custom Participant */}
-            <div className="flex items-center gap-2 mb-4">
-              <Input
-                placeholder="Tên người tham gia..."
-                value={newCustomName}
-                onChange={(e) => setNewCustomName(e.target.value)}
-                className="flex-1"
-                onKeyDown={(e) => e.key === "Enter" && addCustomParticipant()}
-              />
-              <Button onClick={addCustomParticipant} size="sm">
-                Thêm
-              </Button>
+            {/* Unified Participant Input */}
+            <div className="mb-4">
+              <Label className="text-sm font-medium mb-2 block">
+                Thêm người tham gia:
+              </Label>
+              <div className="flex items-center gap-2">
+                <div className="flex-1 relative">
+                  <Input
+                    type="text"
+                    value={participantInput}
+                    onChange={(e) => setParticipantInput(e.target.value)}
+                    placeholder="Tìm kiếm cầu thủ hoặc nhập tên mới..."
+                    disabled={isLoadingPlayers}
+                    onKeyDown={(e) => e.key === "Enter" && addParticipant()}
+                    className="w-full"
+                  />
+                  {/* Custom dropdown for player suggestions */}
+                  {participantInput.trim() && availablePlayers.length > 0 && (
+                    <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-60 overflow-auto">
+                      {availablePlayers
+                        .filter((player) =>
+                          player.label
+                            .toLowerCase()
+                            .includes(participantInput.toLowerCase())
+                        )
+                        .slice(0, 10) // Limit to 10 suggestions
+                        .map((player) => (
+                          <button
+                            key={player.value}
+                            type="button"
+                            onClick={() => {
+                              setParticipantInput(player.label);
+                            }}
+                            className="w-full px-3 py-2 text-left text-sm hover:bg-gray-100 focus:bg-gray-100 focus:outline-none"
+                          >
+                            <div className="flex flex-col">
+                              <span>{player.label}</span>
+                              {player.secondary && (
+                                <span className="text-xs text-gray-500">
+                                  {player.secondary}
+                                </span>
+                              )}
+                            </div>
+                          </button>
+                        ))}
+                      {/* Option to add as new participant */}
+                      {!availablePlayers.some(
+                        (player) =>
+                          player.label.toLowerCase() ===
+                          participantInput.toLowerCase()
+                      ) && (
+                        <button
+                          type="button"
+                          onClick={() => addParticipant()}
+                          className="w-full px-3 py-2 text-left text-sm hover:bg-blue-50 focus:bg-blue-50 focus:outline-none border-t border-gray-200"
+                        >
+                          <div className="flex items-center gap-2">
+                            <span className="text-blue-600">+</span>
+                            <span>
+                              Thêm "{participantInput}" làm người tham gia mới
+                            </span>
+                          </div>
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
+                <Button
+                  onClick={addParticipant}
+                  size="sm"
+                  disabled={!participantInput.trim() || isLoadingPlayers}
+                >
+                  {isLoadingPlayers ? "Đang tải..." : "Thêm"}
+                </Button>
+              </div>
+              <p className="text-xs text-gray-500 mt-1">
+                Tìm kiếm cầu thủ có sẵn hoặc nhập tên mới để thêm người tham gia
+              </p>
             </div>
 
             {/* Custom Participants List */}
@@ -849,8 +1019,17 @@ export default function SettlementPage() {
                           <span className="font-medium">
                             {participant.name}
                           </span>
-                          <Badge variant="outline" className="text-xs">
-                            Tùy chỉnh
+                          <Badge
+                            variant={
+                              participant.isExistingPlayer
+                                ? "default"
+                                : "outline"
+                            }
+                            className="text-xs"
+                          >
+                            {participant.isExistingPlayer
+                              ? "Cầu thủ"
+                              : "Tùy chỉnh"}
                           </Badge>
                         </div>
 

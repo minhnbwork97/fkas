@@ -9,15 +9,16 @@ datasource db {
 }
 
 model Player {
-  id          String             @id @default(uuid())
-  name        String
-  phone       String?
-  balance     Int                @default(0)
-  createdAt   DateTime           @default(now())
-  intents     AttendanceIntent[]
-  actuals     AttendanceActual[]
-  txs         Transaction[]
-  settlements Settlement[]
+  id              String             @id @default(uuid())
+  name            String
+  phone           String?
+  balance         Int                @default(0)
+  createdAt       DateTime           @default(now())
+  intents         AttendanceIntent[]
+  actuals         AttendanceActual[]
+  txs             Transaction[]
+  settlements     Settlement[]
+  customAttendees CustomAttendee[]
 }
 
 model Match {
@@ -117,8 +118,10 @@ model CustomAttendee {
   matchId     String
   name        String
   guestCount  Int          @default(0)
+  playerId    String? // Optional: for existing players added to custom list
   createdAt   DateTime     @default(now())
   match       Match        @relation(fields: [matchId], references: [id])
+  player      Player?      @relation(fields: [playerId], references: [id])
   settlements Settlement[]
 }
 
