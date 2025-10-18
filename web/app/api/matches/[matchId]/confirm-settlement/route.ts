@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/src/lib/prisma";
 import { assertAdmin } from "@/src/lib/adminGuard";
+import { executeTransaction } from "@/src/lib/transaction";
 
 export async function POST(
   req: NextRequest,
@@ -82,8 +83,28 @@ export async function POST(
     // Track how many settlements were auto-paid
     let autoMarkedPaidCount = 0;
 
+    // Pre-check which players have contributed to fund to avoid nested queries in transaction
+    const playerIds = unpaidPlayerSettlements
+      .map((s) => s.playerId)
+      .filter((id): id is string => Boolean(id));
+
+    const playersWithFunds = new Set(
+      playerIds.length > 0
+        ? (
+            await prisma.transaction.findMany({
+              where: {
+                playerId: { in: playerIds },
+                type: { in: ["TopUp", "Charge"] },
+              },
+              select: { playerId: true },
+              distinct: ["playerId"],
+            })
+          ).map((t) => t.playerId)
+        : []
+    );
+
     // Use transaction to update match status and auto-pay player settlements
-    await prisma.$transaction(async (tx) => {
+    await executeTransaction(async (tx) => {
       // Update match status to settled
       await tx.match.update({
         where: { id: matchId },
@@ -94,13 +115,11 @@ export async function POST(
       for (const settlement of unpaidPlayerSettlements) {
         if (!settlement.player || !settlement.playerId) continue;
 
-        // Check if player has any previous transactions (indicating they've contributed to the fund)
-        const hasContributedToFund = await tx.transaction.count({
-          where: { playerId: settlement.playerId },
-        });
+        // Check if player has contributed to fund (using pre-fetched data)
+        const hasContributedToFund = playersWithFunds.has(settlement.playerId);
 
         // Only mark as paid and deduct from fund if player has contributed before
-        if (hasContributedToFund > 0) {
+        if (hasContributedToFund) {
           // Mark settlement as paid
           await tx.settlement.update({
             where: { id: settlement.id },

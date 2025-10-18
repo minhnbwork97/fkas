@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/src/lib/prisma";
+import { executeTransaction } from "@/src/lib/transaction";
 
 export async function POST(
   req: NextRequest,
@@ -70,11 +71,14 @@ export async function POST(
 
     // Check if player has any previous transactions (indicating they've contributed to the fund)
     const hasContributedToFund = await prisma.transaction.count({
-      where: { playerId: playerId },
+      where: {
+        playerId: playerId,
+        type: { in: ["TopUp", "Charge"] },
+      },
     });
 
     // Use transaction to ensure atomicity when deducting from fund
-    const result = await prisma.$transaction(async (tx) => {
+    const result = await executeTransaction(async (tx) => {
       const updatedSettlement = await tx.settlement.update({
         where: { id: settlement.id },
         data: {

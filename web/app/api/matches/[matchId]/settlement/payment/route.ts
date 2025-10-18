@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/src/lib/prisma";
 import { assertAdmin } from "@/src/lib/adminGuard";
+import { executeTransaction } from "@/src/lib/transaction";
 
 async function handlePayment(
   req: NextRequest,
@@ -62,12 +63,15 @@ async function handlePayment(
     // Check if player has any previous transactions (indicating they've contributed to the fund)
     const hasContributedToFund = existing.playerId
       ? await prisma.transaction.count({
-          where: { playerId: existing.playerId },
+          where: {
+            playerId: existing.playerId,
+            type: { in: ["TopUp", "Charge"] },
+          },
         })
       : 0;
 
     // Use transaction to ensure atomicity when deducting from fund
-    const result = await prisma.$transaction(async (tx) => {
+    const result = await executeTransaction(async (tx) => {
       const settlement = await tx.settlement.update({
         where: { id: existing.id },
         data: { paid },
