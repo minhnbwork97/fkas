@@ -9,38 +9,57 @@ export async function POST(
   try {
     const { matchId } = await context.params;
     const body = await req.json();
-    const { deviceId } = body;
+    const { deviceId, phone } = body;
 
-    if (!deviceId) {
+    if (!deviceId && !phone) {
       return NextResponse.json(
-        { error: "Device ID required" },
+        { error: "Device ID or phone required" },
         { status: 400 }
       );
     }
 
-    // Find player by device ID through approved roster request
-    const approvedRequest = await prisma.pendingRosterRequest.findFirst({
-      where: {
-        deviceId: deviceId,
-        status: "Approved",
-      },
-      orderBy: { createdAt: "desc" },
-    });
+    // Find player either by device ID or phone
+    let player: { id: string; name: string } | null = null;
 
-    if (!approvedRequest) {
-      return NextResponse.json(
-        { error: "Không tìm thấy cầu thủ với thiết bị này" },
-        { status: 404 }
-      );
+    if (deviceId) {
+      // Find player by device ID through approved roster request
+      const approvedRequest = await prisma.pendingRosterRequest.findFirst({
+        where: {
+          deviceId: deviceId,
+          status: "Approved",
+        },
+        orderBy: { createdAt: "desc" },
+      });
+
+      if (!approvedRequest) {
+        return NextResponse.json(
+          { error: "Không tìm thấy cầu thủ với thiết bị này" },
+          { status: 404 }
+        );
+      }
+
+      // Find the player by name and phone
+      const foundPlayer = await prisma.player.findFirst({
+        where: {
+          name: approvedRequest.name,
+          phone: approvedRequest.phone,
+        },
+      });
+
+      if (foundPlayer) {
+        player = { id: foundPlayer.id, name: foundPlayer.name };
+      }
+    } else if (phone) {
+      // Find player directly by phone
+      const foundPlayer = await prisma.player.findFirst({
+        where: { phone },
+        select: { id: true, name: true },
+      });
+
+      if (foundPlayer) {
+        player = foundPlayer;
+      }
     }
-
-    // Find the player by name and phone
-    const player = await prisma.player.findFirst({
-      where: {
-        name: approvedRequest.name,
-        phone: approvedRequest.phone,
-      },
-    });
 
     if (!player) {
       return NextResponse.json(

@@ -32,6 +32,7 @@ export default function MatchPaymentPage() {
   const [hasTriedResolve, setHasTriedResolve] = useState<boolean>(false);
   const [isLoadingPaymentInfo, setIsLoadingPaymentInfo] =
     useState<boolean>(false);
+  const [identifiedViaPhone, setIdentifiedViaPhone] = useState<boolean>(false);
 
   useEffect(() => {
     const load = async () => {
@@ -53,6 +54,7 @@ export default function MatchPaymentPage() {
             const playerData = await playerRes.json();
             foundPlayerId = playerData.playerId as string;
             setPlayerId(foundPlayerId);
+            setIdentifiedViaPhone(false); // Mark that user was identified via device
           }
         }
         // Fetch player balance and transaction status (only if player known)
@@ -135,6 +137,7 @@ export default function MatchPaymentPage() {
         }
         const resolvedPlayerId = pd.player.id as string;
         setPlayerId(resolvedPlayerId);
+        setIdentifiedViaPhone(true); // Mark that user was identified via phone
 
         // Step 2 & 3: fetch player balance and then settlement + QR with loading state
         setIsLoadingPaymentInfo(true);
@@ -180,8 +183,18 @@ export default function MatchPaymentPage() {
     setIsReporting(true);
     try {
       const deviceId = getDeviceId();
-      if (!deviceId) {
-        toast.error("Không xác định được thiết bị");
+      const requestBody: { deviceId?: string; phone?: string } = {};
+
+      // Try device ID first, fall back to phone if available
+      if (deviceId) {
+        requestBody.deviceId = deviceId;
+      } else if (phone.trim()) {
+        requestBody.phone = phone.trim();
+      } else {
+        const errorMessage = identifiedViaPhone
+          ? "Vui lòng nhập lại số điện thoại để xác nhận thanh toán"
+          : "Không xác định được thiết bị hoặc số điện thoại";
+        toast.error(errorMessage);
         return;
       }
 
@@ -192,7 +205,7 @@ export default function MatchPaymentPage() {
           headers: {
             "Content-Type": "application/json",
           },
-          body: JSON.stringify({ deviceId }),
+          body: JSON.stringify(requestBody),
         }
       );
 
