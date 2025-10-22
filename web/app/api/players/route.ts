@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/src/lib/prisma";
 import { assertAdmin } from "@/src/lib/adminGuard";
+import { Prisma } from "@prisma/client";
 
 export async function GET(req: NextRequest) {
   try {
@@ -87,9 +88,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ player }, { status: 201 });
   } catch (e: unknown) {
     // Handle Prisma unique constraint error gracefully
-    if (typeof e === "object" && e !== null && "code" in e) {
-      const code = (e as any).code as string | undefined;
-      if (code === "P2002") {
+    if (e instanceof Prisma.PrismaClientKnownRequestError) {
+      if (e.code === "P2002") {
         return NextResponse.json(
           { error: "Số điện thoại này đã được đăng ký" },
           { status: 409 }
