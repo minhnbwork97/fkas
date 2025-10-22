@@ -175,19 +175,21 @@ export default function OrganizerEditMatchPage() {
 
   return (
     <main className="max-w-4xl mx-auto p-3 sm:p-6 space-y-4 sm:space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">Chi Tiết Trận Đấu</h1>
-        <div className="flex gap-2">
+      <div className="flex items-start sm:items-center justify-between gap-2">
+        <h1 className="text-xl sm:text-2xl font-semibold">Chi Tiết Trận Đấu</h1>
+        <div className="flex gap-2 flex-wrap justify-end">
           <Button
+            size="sm"
             variant="outline"
             onClick={() => router.push("/organizer/matches")}
           >
             Quay Lại
           </Button>
-          <Button onClick={() => router.push(`/m/${matchId}`)}>
+          <Button size="sm" onClick={() => router.push(`/m/${matchId}`)}>
             Xem Trang Cầu Thủ
           </Button>
           <Button
+            size="sm"
             variant="outline"
             onClick={() => router.push(`/organizer/settlement/${matchId}`)}
           >
@@ -232,9 +234,9 @@ export default function OrganizerEditMatchPage() {
       ) : matchInfo ? (
         <Card>
           <CardHeader>
-            <div className="flex items-center justify-between">
-              <CardTitle>Thông Tin Trận Đấu</CardTitle>
-              <div className="flex gap-2">
+            <div className="flex items-start sm:items-center justify-between gap-2">
+              <CardTitle className="text-lg sm:text-xl">Thông Tin Trận Đấu</CardTitle>
+              <div className="flex gap-2 flex-wrap justify-end">
                 {!isEditing ? (
                   <Button
                     size="sm"
@@ -244,7 +246,7 @@ export default function OrganizerEditMatchPage() {
                     Chỉnh Sửa
                   </Button>
                 ) : (
-                  <div className="flex gap-2">
+                  <div className="flex gap-2 flex-wrap justify-end">
                     <Button size="sm" onClick={save}>
                       Lưu
                     </Button>
@@ -260,12 +262,12 @@ export default function OrganizerEditMatchPage() {
               </div>
             </div>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <CardContent className="space-y-3 sm:space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
               <div className="space-y-2">
                 <Label className="text-sm font-medium">Ngày & Giờ</Label>
                 {!isEditing ? (
-                  <p className="text-base sm:text-lg">
+                  <p className="text-sm sm:text-lg">
                     {new Date(matchInfo.dateTime).toLocaleString("vi-VN")}
                   </p>
                 ) : (
@@ -304,7 +306,7 @@ export default function OrganizerEditMatchPage() {
               </div>
               <div className="space-y-2">
                 <Label className="text-sm font-medium">Link Điểm Danh</Label>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   <Button
                     size="sm"
                     variant="outline"
@@ -323,9 +325,8 @@ export default function OrganizerEditMatchPage() {
               <div className="space-y-2">
                 <Label className="text-sm font-medium">Chi Phí Sân</Label>
                 {!isEditing ? (
-                  <p className="text-base sm:text-lg font-semibold">
-                    {matchInfo.fieldCost?.toLocaleString("vi-VN") || "600,000"}{" "}
-                    VND
+                  <p className="text-sm sm:text-lg font-semibold">
+                    {matchInfo.fieldCost?.toLocaleString("vi-VN") || "600,000"} VND
                   </p>
                 ) : (
                   <CurrencyInput
@@ -338,21 +339,14 @@ export default function OrganizerEditMatchPage() {
             </div>
 
             {qrDataUrl && (
-              <div className="flex justify-center pt-4">
+              <div className="flex justify-center pt-3 sm:pt-4">
                 <div className="text-center">
-                  <Image
-                    alt="QR Trận Đấu"
-                    src={qrDataUrl}
-                    width={120}
-                    height={120}
-                  />
-                  <p className="text-sm text-gray-600 mt-2">
-                    QR Code để chia sẻ
-                  </p>
+                  <Image alt="QR Trận Đấu" src={qrDataUrl} width={110} height={110} />
+                  <p className="text-xs sm:text-sm text-gray-600 mt-2">QR Code để chia sẻ</p>
                 </div>
               </div>
             )}
-            {msg && <p className="text-sm text-gray-600 mt-2">{msg}</p>}
+            {msg && <p className="text-xs sm:text-sm text-gray-600 mt-2">{msg}</p>}
           </CardContent>
         </Card>
       ) : null}
@@ -558,8 +552,7 @@ export default function OrganizerEditMatchPage() {
 
                       {/* Update Time */}
                       <p className="text-xs text-gray-500">
-                        Cập nhật:{" "}
-                        {new Date(item.updatedAt).toLocaleString("vi-VN")}
+                        Cập nhật: {new Date(item.updatedAt).toLocaleString("vi-VN")}
                       </p>
                     </div>
                   </div>

@@ -84,7 +84,8 @@ export async function GET(
         if (match) {
           const description = formatMatchPaymentDescription(
             new Date(match.dateTime),
-            matchId
+            matchId,
+            player.name
           );
 
           qrCodeUrl = await generatePaymentQR({

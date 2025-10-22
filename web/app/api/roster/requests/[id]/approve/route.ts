@@ -18,6 +18,20 @@ export async function POST(
     if (!reqItem)
       return NextResponse.json({ error: "Không tìm thấy" }, { status: 404 });
 
+    // If phone exists, ensure not duplicated
+    if (reqItem.phone) {
+      const existing = await prisma.player.findFirst({
+        where: { phone: reqItem.phone },
+        select: { id: true },
+      });
+      if (existing) {
+        return NextResponse.json(
+          { error: "Số điện thoại này đã được đăng ký" },
+          { status: 409 }
+        );
+      }
+    }
+
     const player = await prisma.player.create({
       data: { name: reqItem.name, phone: reqItem.phone ?? undefined },
     });

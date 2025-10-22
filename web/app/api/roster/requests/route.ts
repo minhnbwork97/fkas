@@ -8,10 +8,42 @@ export async function POST(req: NextRequest) {
     const { name, phone, deviceId } = body ?? {};
     if (!name || typeof name !== "string")
       return NextResponse.json({ error: "Tên là bắt buộc" }, { status: 400 });
+    if (!phone || typeof phone !== "string" || phone.trim().length === 0) {
+      return NextResponse.json(
+        { error: "Số điện thoại là bắt buộc" },
+        { status: 400 }
+      );
+    }
+
+    const normalizedPhone = phone.trim();
+
+    // Prevent duplicate phone numbers: check existing Player
+    const existingPlayer = await prisma.player.findFirst({
+      where: { phone: normalizedPhone },
+      select: { id: true },
+    });
+    if (existingPlayer) {
+      return NextResponse.json(
+        { error: "Số điện thoại này đã được đăng ký" },
+        { status: 409 }
+      );
+    }
+
+    // Prevent duplicate pending requests with same phone
+    const existingPending = await prisma.pendingRosterRequest.findFirst({
+      where: { phone: normalizedPhone, status: "Pending" },
+      select: { id: true },
+    });
+    if (existingPending) {
+      return NextResponse.json(
+        { error: "Đã có yêu cầu chờ duyệt với số điện thoại này" },
+        { status: 409 }
+      );
+    }
     const created = await prisma.pendingRosterRequest.create({
       data: {
         name,
-        phone: phone ?? null,
+        phone: normalizedPhone,
         deviceId: deviceId ?? null,
         status: "Pending",
       },

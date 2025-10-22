@@ -111,7 +111,8 @@ export async function generatePaymentQR(
  */
 export function formatMatchPaymentDescription(
   matchDate: Date,
-  matchId?: string
+  matchId?: string,
+  playerName?: string
 ): string {
   const dateStr = matchDate.toLocaleDateString("vi-VN", {
     day: "2-digit",
@@ -119,9 +120,24 @@ export function formatMatchPaymentDescription(
     year: "numeric",
   });
 
-  if (matchId) {
-    return `FKAS Tran ${dateStr} ${matchId.substring(0, 8)}`;
+  // Base: include short match id if available (remove "Tran" per request)
+  let base = matchId
+    ? `FKAS ${dateStr} ${matchId.substring(0, 8)}`
+    : `FKAS ${dateStr}`;
+
+  // Optionally append player name
+  if (playerName && playerName.trim().length > 0) {
+    // Sanitize to ASCII: remove accents and non-alphanumeric (keep spaces)
+    const asciiName = playerName
+      .normalize("NFD")
+      .replace(/\p{Diacritic}+/gu, "")
+      .replace(/[^a-zA-Z0-9 ]+/g, "")
+      .trim();
+    if (asciiName) {
+      base = `${base} - ${asciiName}`;
+    }
   }
 
-  return `FKAS Tran ${dateStr}`;
+  // VietQR addInfo recommended max length ~50 chars; truncate defensively
+  return base.length > 50 ? base.slice(0, 50) : base;
 }

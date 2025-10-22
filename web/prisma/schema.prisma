@@ -11,7 +11,7 @@ datasource db {
 model Player {
   id              String             @id @default(uuid())
   name            String
-  phone           String?
+  phone           String?            @unique
   balance         Int                @default(0)
   createdAt       DateTime           @default(now())
   intents         AttendanceIntent[]

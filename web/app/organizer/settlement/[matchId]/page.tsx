@@ -448,8 +448,8 @@ export default function SettlementPage() {
 
     const newPaidStatus = !currentTransaction.paid;
 
-    // Determine whether this is a custom attendee (id not in attendance list)
-    const isCustom = !attendance.some((a) => a.playerId === playerId);
+    // Determine custom vs player from transaction (reliable even if not in attendance list)
+    const isCustom = currentTransaction.isCustom === true;
 
     try {
       const pin = localStorage.getItem(PIN_KEY) || "";
@@ -735,11 +735,12 @@ export default function SettlementPage() {
   }
 
   return (
-    <main className="max-w-4xl mx-auto p-6 space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">Thanh Toán Trận Đấu</h1>
-        <div className="flex gap-2">
+    <main className="max-w-4xl mx-auto p-4 sm:p-6 space-y-4 sm:space-y-6">
+      <div className="flex items-start sm:items-center justify-between gap-2">
+        <h1 className="text-xl sm:text-2xl font-semibold">Thanh Toán Trận Đấu</h1>
+        <div className="flex gap-2 flex-wrap justify-end">
           <Button
+            size="sm"
             variant="outline"
             onClick={() => router.push(`/organizer/matches/${matchId}`)}
           >
@@ -751,25 +752,22 @@ export default function SettlementPage() {
       {/* Field Cost Display */}
       <Card>
         <CardHeader>
-          <CardTitle>Chi Phí Sân</CardTitle>
+          <CardTitle className="text-lg sm:text-xl">Chi Phí Sân</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div className="flex items-center gap-2">
-              <span className="text-sm font-medium text-gray-700">
-                Chi phí sân:
-              </span>
+              <span className="text-sm font-medium text-gray-700">Chi phí sân:</span>
               <span className="text-lg font-semibold text-blue-600">
                 {fieldCost.toLocaleString("vi-VN")} VND
               </span>
               {matchStatus === "Settled" && (
-                <Badge variant="default" className="ml-2 bg-green-600">
-                  ✓ Đã xác nhận thanh toán
-                </Badge>
+                <Badge variant="default" className="ml-0 sm:ml-2 bg-green-600">✓ Đã xác nhận thanh toán</Badge>
               )}
             </div>
-            <div className="flex gap-2">
+            <div className="flex gap-2 flex-wrap justify-end">
               <Button
+                size="sm"
                 onClick={calculateSummary}
                 disabled={isLoadingSettlement || matchStatus === "Settled"}
               >
@@ -777,14 +775,13 @@ export default function SettlementPage() {
               </Button>
               {summary && matchStatus !== "Settled" && (
                 <Button
+                  size="sm"
                   onClick={confirmSettlement}
                   disabled={isConfirmingSettlement}
                   variant="default"
                   className="bg-green-600 hover:bg-green-700"
                 >
-                  {isConfirmingSettlement
-                    ? "Đang xác nhận..."
-                    : "Xác Nhận Thanh Toán"}
+                  {isConfirmingSettlement ? "Đang xác nhận..." : "Xác Nhận Thanh Toán"}
                 </Button>
               )}
             </div>
@@ -795,35 +792,27 @@ export default function SettlementPage() {
       {/* Attendance List */}
       <Card>
         <CardHeader>
-          <CardTitle>Danh Sách Tham Gia Thực Tế</CardTitle>
+          <CardTitle className="text-lg sm:text-xl">Danh Sách Tham Gia Thực Tế</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="space-y-3">
             {attendance.map((item) => (
               <div
                 key={item.playerId}
-                className="flex items-center justify-between p-3 border rounded-lg"
+                className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-3 border rounded-lg gap-2"
               >
                 <div className="flex-1">
                   <div className="flex items-center gap-2 mb-2">
                     <span className="font-medium">{item.playerName}</span>
-                    <Badge
-                      variant={
-                        item.status === "Attending" ? "default" : "secondary"
-                      }
-                    >
-                      {item.status === "Attending"
-                        ? "Đã Xác Nhận"
-                        : "Không Xác Nhận"}
+                    <Badge variant={item.status === "Attending" ? "default" : "secondary"}>
+                      {item.status === "Attending" ? "Đã Xác Nhận" : "Không Xác Nhận"}
                     </Badge>
                     {item.isLate && <Badge variant="outline">Muộn</Badge>}
                   </div>
 
                   {/* Member Attendance Control - 2-State Button */}
                   <div className="flex items-center gap-3 mb-2">
-                    <span className="text-sm font-medium">
-                      Thành viên tham gia:
-                    </span>
+                    <span className="text-sm font-medium">Thành viên tham gia:</span>
                     <Button
                       variant={item.memberAttended ? "default" : "outline"}
                       size="sm"
@@ -846,35 +835,22 @@ export default function SettlementPage() {
                       min="0"
                       value={item.guestsAttended}
                       onChange={(e) =>
-                        updateGuestsAttended(
-                          item.playerId,
-                          parseInt(e.target.value) || 0
-                        )
+                        updateGuestsAttended(item.playerId, parseInt(e.target.value) || 0)
                       }
                       className="w-16 h-8 text-sm"
                     />
                     {item.guestsAttended > 0 && (
-                      <Badge variant="default" className="text-xs">
-                        ✓ {item.guestsAttended} khách
-                      </Badge>
+                      <Badge variant="default" className="text-xs">✓ {item.guestsAttended} khách</Badge>
                     )}
                   </div>
 
-                  {item.note && (
-                    <p className="text-sm text-gray-600 mt-1">{item.note}</p>
-                  )}
+                  {item.note && <p className="text-sm text-gray-600 mt-1">{item.note}</p>}
                 </div>
-                <div className="text-right">
+                <div className="text-left sm:text-right mt-2 sm:mt-0">
                   <div className="text-sm text-gray-600 space-y-1">
-                    <div>
-                      {item.memberAttended
-                        ? "✓ Thành viên có mặt"
-                        : "✗ Thành viên vắng mặt"}
-                    </div>
+                    <div>{item.memberAttended ? "✓ Thành viên có mặt" : "✗ Thành viên vắng mặt"}</div>
                     {item.guestsAttended > 0 && (
-                      <div className="text-xs text-blue-600">
-                        +{item.guestsAttended} khách tham gia
-                      </div>
+                      <div className="text-xs text-blue-600">+{item.guestsAttended} khách tham gia</div>
                     )}
                   </div>
                 </div>
@@ -883,18 +859,12 @@ export default function SettlementPage() {
           </div>
 
           {/* Guests Without Host Section */}
-          {attendance.some(
-            (item) => !item.memberAttended && item.guestsAttended > 0
-          ) && (
+          {attendance.some((item) => !item.memberAttended && item.guestsAttended > 0) && (
             <div className="mt-6 pt-4 border-t">
-              <h3 className="font-medium mb-3 text-orange-700">
-                Khách Tham Gia Không Có Chủ
-              </h3>
+              <h3 className="font-medium mb-3 text-orange-700">Khách Tham Gia Không Có Chủ</h3>
               <div className="space-y-2">
                 {attendance
-                  .filter(
-                    (item) => !item.memberAttended && item.guestsAttended > 0
-                  )
+                  .filter((item) => !item.memberAttended && item.guestsAttended > 0)
                   .map((item) => (
                     <div
                       key={item.playerId}
@@ -903,23 +873,12 @@ export default function SettlementPage() {
                       <div className="flex items-center gap-3">
                         <div className="flex-1">
                           <div className="flex items-center gap-2 mb-1">
-                            <span className="font-medium text-orange-800">
-                              {item.playerName} (không tham gia)
-                            </span>
-                            <Badge
-                              variant="outline"
-                              className="text-xs bg-orange-100 text-orange-800"
-                            >
-                              Chủ không tham gia
-                            </Badge>
+                            <span className="font-medium text-orange-800">{item.playerName} (không tham gia)</span>
+                            <Badge variant="outline" className="text-xs bg-orange-100 text-orange-800">Chủ không tham gia</Badge>
                           </div>
                           <div className="flex items-center gap-2">
-                            <span className="text-sm text-orange-700">
-                              Nhưng {item.guestsAttended} khách vẫn tham gia
-                            </span>
-                            <Badge variant="default" className="text-xs">
-                              ✓ {item.guestsAttended} khách
-                            </Badge>
+                            <span className="text-sm text-orange-700">Nhưng {item.guestsAttended} khách vẫn tham gia</span>
+                            <Badge variant="default" className="text-xs">✓ {item.guestsAttended} khách</Badge>
                           </div>
                         </div>
                       </div>
@@ -935,9 +894,7 @@ export default function SettlementPage() {
 
             {/* Unified Participant Input */}
             <div className="mb-4">
-              <Label className="text-sm font-medium mb-2 block">
-                Thêm người tham gia:
-              </Label>
+              <Label className="text-sm font-medium mb-2 block">Thêm người tham gia:</Label>
               <div className="flex items-center gap-2">
                 <div className="flex-1 relative">
                   <Input
@@ -954,11 +911,9 @@ export default function SettlementPage() {
                     <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-60 overflow-auto">
                       {availablePlayers
                         .filter((player) =>
-                          player.label
-                            .toLowerCase()
-                            .includes(participantInput.toLowerCase())
+                          player.label.toLowerCase().includes(participantInput.toLowerCase())
                         )
-                        .slice(0, 10) // Limit to 10 suggestions
+                        .slice(0, 10)
                         .map((player) => (
                           <button
                             key={player.value}
@@ -971,18 +926,14 @@ export default function SettlementPage() {
                             <div className="flex flex-col">
                               <span>{player.label}</span>
                               {player.secondary && (
-                                <span className="text-xs text-gray-500">
-                                  {player.secondary}
-                                </span>
+                                <span className="text-xs text-gray-500">{player.secondary}</span>
                               )}
                             </div>
                           </button>
                         ))}
                       {/* Option to add as new participant */}
                       {!availablePlayers.some(
-                        (player) =>
-                          player.label.toLowerCase() ===
-                          participantInput.toLowerCase()
+                        (player) => player.label.toLowerCase() === participantInput.toLowerCase()
                       ) && (
                         <button
                           type="button"
@@ -991,27 +942,18 @@ export default function SettlementPage() {
                         >
                           <div className="flex items-center gap-2">
                             <span className="text-blue-600">+</span>
-                            <span>
-                              Thêm &quot;{participantInput}&quot; làm người tham
-                              gia mới
-                            </span>
+                            <span>Thêm &quot;{participantInput}&quot; làm người tham gia mới</span>
                           </div>
                         </button>
                       )}
                     </div>
                   )}
                 </div>
-                <Button
-                  onClick={addParticipant}
-                  size="sm"
-                  disabled={!participantInput.trim() || isLoadingPlayers}
-                >
+                <Button onClick={addParticipant} size="sm" disabled={!participantInput.trim() || isLoadingPlayers}>
                   {isLoadingPlayers ? "Đang tải..." : "Thêm"}
                 </Button>
               </div>
-              <p className="text-xs text-gray-500 mt-1">
-                Tìm kiếm cầu thủ có sẵn hoặc nhập tên mới để thêm người tham gia
-              </p>
+              <p className="text-xs text-gray-500 mt-1">Tìm kiếm cầu thủ có sẵn hoặc nhập tên mới để thêm người tham gia</p>
             </div>
 
             {/* Custom Participants List */}
@@ -1020,25 +962,17 @@ export default function SettlementPage() {
                 {customParticipants.map((participant) => (
                   <div
                     key={participant.id}
-                    className="flex items-center justify-between p-3 bg-blue-50 border border-blue-200 rounded-lg"
+                    className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-3 bg-blue-50 border border-blue-200 rounded-lg gap-2"
                   >
                     <div className="flex items-center gap-3">
                       <div className="flex-1">
                         <div className="flex items-center gap-2 mb-2">
-                          <span className="font-medium">
-                            {participant.name}
-                          </span>
+                          <span className="font-medium">{participant.name}</span>
                           <Badge
-                            variant={
-                              participant.isExistingPlayer
-                                ? "default"
-                                : "outline"
-                            }
+                            variant={participant.isExistingPlayer ? "default" : "outline"}
                             className="text-xs"
                           >
-                            {participant.isExistingPlayer
-                              ? "Cầu thủ"
-                              : "Tùy chỉnh"}
+                            {participant.isExistingPlayer ? "Cầu thủ" : "Tùy chỉnh"}
                           </Badge>
                         </div>
 
@@ -1058,9 +992,7 @@ export default function SettlementPage() {
                             className="w-16 h-8 text-sm"
                           />
                           {participant.guestCount > 0 && (
-                            <Badge variant="secondary" className="text-xs">
-                              +{participant.guestCount} khách
-                            </Badge>
+                            <Badge variant="secondary" className="text-xs">+{participant.guestCount} khách</Badge>
                           )}
                         </div>
                       </div>
@@ -1097,33 +1029,31 @@ export default function SettlementPage() {
       {summary && (
         <Card>
           <CardHeader>
-            <CardTitle>Tóm Tắt Thanh Toán</CardTitle>
+            <CardTitle className="text-lg sm:text-xl">Tóm Tắt Thanh Toán</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <CardContent className="space-y-3 sm:space-y-4">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
               <div className="text-center">
-                <p className="text-2xl font-bold text-blue-600">
-                  {summary.totalAttended}
-                </p>
-                <p className="text-sm text-gray-600">Tổng Tham Gia</p>
+                <p className="text-xl sm:text-2xl font-bold text-blue-600">{summary.totalAttended}</p>
+                <p className="text-xs sm:text-sm text-gray-600">Tổng Tham Gia</p>
               </div>
               <div className="text-center">
-                <p className="text-2xl font-bold text-green-600">
+                <p className="text-xl sm:text-2xl font-bold text-green-600">
                   {summary.fieldCost.toLocaleString("vi-VN")} VND
                 </p>
-                <p className="text-sm text-gray-600">Chi Phí Sân</p>
+                <p className="text-xs sm:text-sm text-gray-600">Chi Phí Sân</p>
               </div>
               <div className="text-center">
-                <p className="text-2xl font-bold text-purple-600">
+                <p className="text-xl sm:text-2xl font-bold text-purple-600">
                   {summary.perPersonCost.toLocaleString("vi-VN")} VND
                 </p>
-                <p className="text-sm text-gray-600">Mỗi Người</p>
+                <p className="text-xs sm:text-sm text-gray-600">Mỗi Người</p>
               </div>
               <div className="text-center">
-                <p className="text-2xl font-bold text-orange-600">
+                <p className="text-xl sm:text-2xl font-bold text-orange-600">
                   {summary.remainder.toLocaleString("vi-VN")} VND
                 </p>
-                <p className="text-sm text-gray-600">Số Dư</p>
+                <p className="text-xs sm:text-sm text-gray-600">Số Dư</p>
               </div>
             </div>
 
@@ -1132,7 +1062,7 @@ export default function SettlementPage() {
               {summary.transactions.map((tx) => (
                 <div
                   key={tx.playerId}
-                  className="flex justify-between items-center p-3 bg-gray-50 rounded-lg border"
+                  className="flex flex-col sm:flex-row sm:justify-between sm:items-center p-3 bg-gray-50 rounded-lg border gap-2"
                 >
                   <div className="flex items-center gap-3">
                     <input
@@ -1142,21 +1072,14 @@ export default function SettlementPage() {
                       onChange={() => togglePaymentStatus(tx.playerId)}
                       className="w-4 h-4 text-green-600 bg-gray-100 border-gray-300 rounded focus:ring-green-500"
                     />
-                    <label
-                      htmlFor={`paid-${tx.playerId}`}
-                      className="text-sm font-medium"
-                    >
+                    <label htmlFor={`paid-${tx.playerId}`} className="text-sm font-medium">
                       {tx.playerName}
                     </label>
                   </div>
                   <div className="flex items-center gap-3">
-                    <span className="font-medium">
-                      {tx.amount.toLocaleString("vi-VN")} VND
-                    </span>
+                    <span className="font-medium">{tx.amount.toLocaleString("vi-VN")} VND</span>
                     {tx.paid && (
-                      <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">
-                        ✓ Đã thanh toán
-                      </span>
+                      <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">✓ Đã thanh toán</span>
                     )}
                   </div>
                 </div>

@@ -275,7 +275,7 @@ export default function MatchPaymentPage() {
 
             {/* QR Code section skeleton */}
             <div className="p-4 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-lg border-2 border-blue-200">
-              <div className="text-center space-y-3">
+              <div className="flex flex-col items-center space-y-3">
                 <div className="flex items-center justify-center gap-2">
                   <Skeleton className="h-5 w-5" />
                   <Skeleton className="h-5 w-40" />
@@ -364,7 +364,7 @@ export default function MatchPaymentPage() {
               </div>
 
               <div className="p-4 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-lg border-2 border-blue-200">
-                <div className="text-center space-y-3">
+                <div className="flex flex-col items-center space-y-3">
                   <div className="bg-white p-3 rounded-lg inline-block shadow-sm">
                     <div className="w-64 h-64 mx-auto bg-gray-100 animate-pulse" />
                   </div>
@@ -417,8 +417,8 @@ export default function MatchPaymentPage() {
                 <div className="space-y-4">
                   {/* QR Code Section */}
                   {mySettlement.qrCodeUrl && (
-                    <div className="p-4 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-lg border-2 border-blue-200">
-                      <div className="text-center space-y-3">
+                  <div className="p-4 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-lg border-2 border-blue-200">
+                    <div className="flex flex-col items-center space-y-3">
                         <div className="flex items-center justify-center gap-2 text-blue-900 font-semibold">
                           <svg
                             className="w-5 h-5"

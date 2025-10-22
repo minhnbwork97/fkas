@@ -53,16 +53,32 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
     const name = (body?.name ?? "").trim();
-    const phone = (body?.phone ?? null) as string | null;
+    const rawPhone = (body?.phone ?? null) as string | null;
 
     if (!name) {
       return NextResponse.json({ error: "Tên là bắt buộc" }, { status: 400 });
     }
 
+    const phone = rawPhone && rawPhone.trim().length > 0 ? rawPhone.trim() : null;
+
+    if (phone) {
+      // Check duplicate before inserting to provide friendly error
+      const existing = await prisma.player.findFirst({
+        where: { phone },
+        select: { id: true },
+      });
+      if (existing) {
+        return NextResponse.json(
+          { error: "Số điện thoại này đã được đăng ký" },
+          { status: 409 }
+        );
+      }
+    }
+
     const player = await prisma.player.create({
       data: {
         name,
-        phone: phone && phone.length > 0 ? phone : null,
+        phone,
         balance: 0,
       },
       select: { id: true, name: true, phone: true },
@@ -70,6 +86,16 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ player }, { status: 201 });
   } catch (e: unknown) {
+    // Handle Prisma unique constraint error gracefully
+    if (typeof e === "object" && e !== null && "code" in e) {
+      const code = (e as any).code as string | undefined;
+      if (code === "P2002") {
+        return NextResponse.json(
+          { error: "Số điện thoại này đã được đăng ký" },
+          { status: 409 }
+        );
+      }
+    }
     return NextResponse.json(
       { error: e instanceof Error ? e.message : "Lỗi hệ thống" },
       { status: 500 }
