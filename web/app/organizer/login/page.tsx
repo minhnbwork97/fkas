@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAuth } from "@/src/hooks/useAuth";
+import { PitchMarkings } from "@/components/PitchMarkings";
 
 export default function OrganizerLoginPage() {
   const router = useRouter();
@@ -33,10 +34,14 @@ export default function OrganizerLoginPage() {
   }
 
   return (
-    <main className="max-w-sm mx-auto p-6">
-      <Card>
-        <CardHeader>
-          <CardTitle>Đăng Nhập Quản Lý</CardTitle>
+    <main className="max-w-sm mx-auto p-6 pt-16 sm:pt-24">
+      <Card className="overflow-hidden pt-0">
+        <CardHeader className="pitch-surface relative overflow-hidden py-8 border-b-4 border-floodlight">
+          <PitchMarkings />
+          <p className="relative kit-label text-floodlight">FC Không Giải Tán</p>
+          <CardTitle className="relative text-2xl uppercase text-white">
+            Đăng Nhập Quản Lý
+          </CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
           <Input
@@ -54,7 +59,11 @@ export default function OrganizerLoginPage() {
             }}
           />
           {error && <p className="text-sm text-red-600">{error}</p>}
-          <Button onClick={handleLogin} disabled={!pin.trim()}>
+          <Button
+            className="w-full"
+            onClick={handleLogin}
+            disabled={!pin.trim()}
+          >
             Tiếp Tục
           </Button>
         </CardContent>

@@ -1,6 +1,7 @@
 import { Metadata } from "next";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { OnboardingCarousel } from "./onboarding-carousel";
+import { PitchMarkings } from "@/components/PitchMarkings";
 
 export const metadata: Metadata = {
   title: "Hướng Dẫn Sử Dụng - FC Không Giải Tán",
@@ -10,18 +11,22 @@ export const metadata: Metadata = {
 
 export default function Home() {
   return (
-    <div className="min-h-screen bg-gradient-to-b from-blue-50 to-gray-50 scroll-smooth">
-      <main className="max-w-3xl mx-auto px-4 py-8 sm:px-6">
-        {/* Header */}
-        <div className="text-center mb-8">
-          <h1 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-3">
+    <div className="min-h-screen scroll-smooth">
+      {/* Header */}
+      <header className="pitch-surface relative overflow-hidden border-b-4 border-floodlight">
+        <PitchMarkings />
+        <div className="relative max-w-3xl mx-auto px-4 sm:px-6 pt-12 pb-14 sm:pt-16 sm:pb-20 text-center">
+          <p className="kit-label text-floodlight mb-4">FC Không Giải Tán</p>
+          <h1 className="text-4xl sm:text-6xl !text-white mb-0 text-balance [text-shadow:0_2px_0_oklch(0.27_0.06_162)]">
             Hướng Dẫn Sử Dụng Hệ Thống Điểm Danh
           </h1>
-          <p className="text-lg text-gray-600">FC Không Giải Tán</p>
         </div>
+      </header>
+
+      <main className="max-w-3xl mx-auto px-4 sm:px-6 -mt-6 sm:-mt-8 relative">
 
         {/* Table of Contents */}
-        <Card className="mb-8 bg-white/80 backdrop-blur">
+        <Card className="mb-8 bg-white/95 backdrop-blur">
           <CardContent className="py-4 px-4">
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-3 sm:gap-6">
               <a
@@ -60,12 +65,12 @@ export default function Home() {
         <div className="space-y-8">
           {/* Step 1: Registration */}
           <Card id="dang-ky" className="scroll-mt-4">
-            <CardHeader className="bg-gradient-to-r from-blue-50 to-blue-100/50 p-6 pb-6">
+            <CardHeader className="bg-blue-50 border-b border-blue-100 p-6 pb-6 -mt-6 rounded-t-xl">
               <CardTitle className="text-2xl flex items-center gap-3 m-0">
-                <span className="flex items-center justify-center min-w-[3rem] h-12 rounded-xl bg-blue-600 text-white text-xl font-bold shadow-md">
+                <span className="scoreboard flex items-center justify-center min-w-[3rem] h-12 rounded-md bg-blue-700 text-white text-3xl shadow-[inset_0_-3px_0_rgb(0_0_0/0.2)]">
                   1
                 </span>
-                <span className="text-blue-900">Đăng Ký Tham Gia</span>
+                <span className="text-blue-900 uppercase text-[1.7rem] tracking-wide">Đăng Ký Tham Gia</span>
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -121,12 +126,12 @@ export default function Home() {
 
           {/* Step 2: Attendance */}
           <Card id="diem-danh" className="scroll-mt-4">
-            <CardHeader className="bg-gradient-to-r from-green-50 to-green-100/50 p-6 pb-6">
+            <CardHeader className="bg-green-50 border-b border-green-100 p-6 pb-6 -mt-6 rounded-t-xl">
               <CardTitle className="text-2xl flex items-center gap-3 m-0">
-                <span className="flex items-center justify-center min-w-[3rem] h-12 rounded-xl bg-green-600 text-white text-xl font-bold shadow-md">
+                <span className="scoreboard flex items-center justify-center min-w-[3rem] h-12 rounded-md bg-green-700 text-white text-3xl shadow-[inset_0_-3px_0_rgb(0_0_0/0.2)]">
                   2
                 </span>
-                <span className="text-green-900">Điểm Danh</span>
+                <span className="text-green-900 uppercase text-[1.7rem] tracking-wide">Điểm Danh</span>
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -177,12 +182,12 @@ export default function Home() {
 
           {/* Step 3: Payment */}
           <Card id="thanh-toan" className="scroll-mt-4">
-            <CardHeader className="bg-gradient-to-r from-purple-50 to-purple-100/50 p-6 pb-6">
+            <CardHeader className="bg-purple-50 border-b border-purple-100 p-6 pb-6 -mt-6 rounded-t-xl">
               <CardTitle className="text-2xl flex items-center gap-3 m-0">
-                <span className="flex items-center justify-center min-w-[3rem] h-12 rounded-xl bg-purple-600 text-white text-xl font-bold shadow-md">
+                <span className="scoreboard flex items-center justify-center min-w-[3rem] h-12 rounded-md bg-purple-700 text-white text-3xl shadow-[inset_0_-3px_0_rgb(0_0_0/0.2)]">
                   3
                 </span>
-                <span className="text-purple-900">Thanh Toán Sau Trận</span>
+                <span className="text-purple-900 uppercase text-[1.7rem] tracking-wide">Thanh Toán Sau Trận</span>
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-6">
@@ -240,13 +245,13 @@ export default function Home() {
           </Card>
 
           {/* Final Message */}
-          <Card className="bg-gradient-to-r from-blue-50 to-green-50 border-2 border-blue-200">
+          <Card className="pitch-surface relative overflow-hidden border-0 border-b-4 border-floodlight">
             <CardContent className="py-6">
               <div className="text-center space-y-4">
-                <p className="text-xl font-semibold text-gray-900">
+                <p className="font-display text-2xl font-bold uppercase tracking-wide text-white">
                   🎉 Vậy là xong, thật đơn giản phải không nào!
                 </p>
-                <p className="text-gray-700">
+                <p className="text-white/85">
                   Nếu có đóng góp hoặc thắc mắc, bạn vui lòng gửi trực tiếp đến
                   đội trưởng nhé.
                 </p>
@@ -257,7 +262,7 @@ export default function Home() {
       </main>
 
       {/* Footer */}
-      <footer className="mt-16 pb-8 text-center text-sm text-gray-500">
+      <footer className="mt-16 pb-8 text-center kit-label text-gray-500">
         <p>© 2025 FC Không Giải Tán - Hệ thống quản lý điểm danh và quỹ</p>
       </footer>
     </div>

@@ -208,7 +208,7 @@ export default function ReceivablesPage() {
 
       {/* Summary Card */}
       {summary && (
-        <Card>
+        <Card className="scoreboard-panel">
           <CardHeader>
             <CardTitle>Tổng Quan Công Nợ</CardTitle>
           </CardHeader>

@@ -10,6 +10,7 @@ import {
   Calendar,
 } from "lucide-react";
 import { usePathname } from "next/navigation";
+import { PitchMarkings } from "@/components/PitchMarkings";
 import { useEffect, useState } from "react";
 
 export default function OrganizerLayoutClient({
@@ -73,10 +74,10 @@ export default function OrganizerLayoutClient({
   // Show loading state while checking authentication
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Đang kiểm tra xác thực...</p>
+          <div className="animate-spin rounded-full h-8 w-8 border-2 border-blue-200 border-t-blue-700 mx-auto mb-4"></div>
+          <p className="kit-label text-gray-600">Đang kiểm tra xác thực...</p>
         </div>
       </div>
     );
@@ -98,19 +99,31 @@ export default function OrganizerLayoutClient({
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="bg-white border-b border-gray-200 sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6">
+    <div className="min-h-screen">
+      <header className="pitch-surface relative overflow-hidden sticky top-0 z-50 shadow-[0_4px_0_var(--floodlight)]">
+        <PitchMarkings />
+        <div className="relative max-w-7xl mx-auto px-4 sm:px-6">
           {/* Top bar with home and logout */}
-          <div className="flex items-center justify-between py-3 border-b border-gray-100">
-            <h1 className="text-lg font-semibold text-gray-900">
-              Quản Lý FKGT
-            </h1>
+          <div className="flex items-center justify-between py-3 border-b border-white/15">
+            <div className="flex items-center gap-3">
+              <span
+                aria-hidden="true"
+                className="flex h-9 w-9 items-center justify-center rounded-full border-2 border-floodlight bg-pitch-deep font-display text-sm font-extrabold text-floodlight"
+              >
+                FK
+              </span>
+              <div className="leading-tight">
+                <p className="kit-label text-floodlight/90 !text-[0.65rem]">
+                  FC Không Giải Tán
+                </p>
+                <h1 className="text-xl !text-white">Quản Lý FKGT</h1>
+              </div>
+            </div>
             <Button
               variant="outline"
               size="sm"
               onClick={logout}
-              className="flex items-center gap-2"
+              className="flex items-center gap-2 border-white/30 bg-white/10 text-white hover:bg-white/20 hover:text-white hover:border-white/50"
             >
               <LogOut className="h-4 w-4" />
               Đăng Xuất
@@ -118,7 +131,7 @@ export default function OrganizerLayoutClient({
           </div>
 
           {/* Navigation links */}
-          <nav className="flex items-center gap-1 overflow-x-auto py-2">
+          <nav className="flex items-center gap-1 overflow-x-auto py-2 [scrollbar-width:none]">
             {navLinks.map((link) => {
               const Icon = link.icon;
               const active = isActiveLink(link.href);
@@ -127,10 +140,10 @@ export default function OrganizerLayoutClient({
                   <Button
                     variant={active ? "default" : "ghost"}
                     size="sm"
-                    className={`flex items-center gap-2 whitespace-nowrap ${
+                    className={`flex items-center gap-2 whitespace-nowrap font-display text-[0.95rem] uppercase tracking-wide ${
                       active
-                        ? "bg-blue-600 text-white hover:bg-blue-700"
-                        : "text-gray-700 hover:bg-gray-100"
+                        ? "bg-floodlight text-pitch-deep shadow-none hover:bg-floodlight/90"
+                        : "text-white/85 hover:bg-white/10 hover:text-white"
                     }`}
                   >
                     <Icon className="h-4 w-4" />

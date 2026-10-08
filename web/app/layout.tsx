@@ -1,11 +1,18 @@
 import type { Metadata, Viewport } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Barlow_Condensed, Be_Vietnam_Pro, Geist_Mono } from "next/font/google";
 import { Toaster } from "sonner";
 import "./globals.css";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
+const displayFace = Barlow_Condensed({
+  variable: "--font-display-face",
+  subsets: ["latin", "vietnamese"],
+  weight: ["500", "600", "700", "800"],
+});
+
+const bodyFace = Be_Vietnam_Pro({
+  variable: "--font-body",
+  subsets: ["latin", "vietnamese"],
+  weight: ["400", "500", "600", "700"],
 });
 
 const geistMono = Geist_Mono({
@@ -78,10 +85,18 @@ export default function RootLayout({
   return (
     <html lang="vi">
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+        className={`${displayFace.variable} ${bodyFace.variable} ${geistMono.variable} antialiased`}
       >
         {children}
-        <Toaster />
+        <Toaster
+          toastOptions={{
+            style: {
+              fontFamily: "var(--font-body)",
+              borderRadius: "0.5rem",
+              borderLeft: "4px solid var(--pitch)",
+            },
+          }}
+        />
       </body>
     </html>
   );

@@ -182,7 +182,7 @@ export default function FundPage() {
       </div>
 
       {/* Fund Summary */}
-      <Card>
+      <Card className="scoreboard-panel">
         <CardHeader>
           <CardTitle>Tình Trạng Quỹ</CardTitle>
         </CardHeader>

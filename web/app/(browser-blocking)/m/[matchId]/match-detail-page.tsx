@@ -1,4 +1,5 @@
 "use client";
+import { PitchMarkings } from "@/components/PitchMarkings";
 import { useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -512,11 +513,11 @@ export const MatchAttendance: React.FC = () => {
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 sm:p-4">
           <Skeleton className="h-4 w-32 mb-3" />
           <div className="space-y-2">
-            <div className="bg-white rounded-lg p-3 border border-blue-200">
+            <div className="bg-blue-50 rounded-lg p-3 border border-blue-100">
               <Skeleton className="h-4 w-24 mb-1" />
               <Skeleton className="h-3 w-48" />
             </div>
-            <div className="bg-white rounded-lg p-3 border border-blue-200">
+            <div className="bg-blue-50 rounded-lg p-3 border border-blue-100">
               <Skeleton className="h-4 w-20 mb-1" />
               <Skeleton className="h-3 w-48" />
             </div>
@@ -557,16 +558,21 @@ export const MatchAttendance: React.FC = () => {
 
       {/* Match Information - Priority 1 */}
       {matchInfo && (
-        <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 sm:p-4">
-          <div className="text-xs sm:text-sm text-gray-700 space-y-1">
-            <p>
-              <strong>Thời gian:</strong>{" "}
-              {new Date(matchInfo.dateTime).toLocaleString("vi-VN")}
-            </p>
-            <p>
-              <strong>Loại trận:</strong>{" "}
-              {matchInfo.type === "Internal" ? "Nội bộ" : "Đấu với đội khác"}
-            </p>
+        <div className="pitch-surface relative overflow-hidden rounded-xl border-b-4 border-floodlight px-4 py-4 sm:px-5 sm:py-5 shadow-[0_10px_24px_-14px_oklch(0.27_0.06_162/0.6)]">
+          <PitchMarkings className="text-white/20" />
+          <div className="relative flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <p className="kit-label text-floodlight">Thời gian</p>
+              <p className="scoreboard text-[1.7rem] sm:text-3xl leading-tight text-white whitespace-nowrap">
+                {new Date(matchInfo.dateTime).toLocaleString("vi-VN")}
+              </p>
+            </div>
+            <div className="sm:text-right">
+              <p className="kit-label text-floodlight">Loại trận</p>
+              <p className="text-sm font-semibold text-white">
+                {matchInfo.type === "Internal" ? "Nội bộ" : "Đấu với đội khác"}
+              </p>
+            </div>
           </div>
         </div>
       )}
@@ -574,9 +580,15 @@ export const MatchAttendance: React.FC = () => {
       {/* Player Recognition - Priority 2 */}
       {playerName && (
         <div className="space-y-2">
-          <div className="p-3 bg-gray-50 border border-gray-200 rounded-md">
-            <div className="flex items-center gap-2">
-              <span className="font-medium text-gray-700 text-sm sm:text-base">
+          <div className="p-3 bg-white border border-gray-200 rounded-xl">
+            <div className="flex items-center gap-3">
+              <span
+                aria-hidden="true"
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-pitch font-display text-lg font-bold text-floodlight ring-2 ring-floodlight/60"
+              >
+                {playerName.trim().charAt(0).toUpperCase()}
+              </span>
+              <span className="font-semibold text-gray-900 text-base">
                 {playerName}
               </span>
             </div>
@@ -584,8 +596,8 @@ export const MatchAttendance: React.FC = () => {
         </div>
       )}
       {!playerId && (
-        <div className="bg-white border border-gray-200 rounded-lg p-4 sm:p-5 space-y-3 sm:space-y-4">
-          <h2 className="text-base sm:text-lg font-semibold text-gray-900">
+        <div className="bg-white border border-gray-200 rounded-xl p-4 sm:p-5 shadow-[0_1px_0_var(--color-gray-200),0_8px_20px_-14px_oklch(0.27_0.06_162/0.3)] space-y-3 sm:space-y-4">
+          <h2 className="text-lg sm:text-xl font-bold text-gray-900">
             Xác Nhận Danh Tính
           </h2>
           <div className="space-y-2">
@@ -630,9 +642,9 @@ export const MatchAttendance: React.FC = () => {
       )}
 
       {/* Attendance Form - Priority 3 (Main Content) */}
-      <div className="bg-white border border-gray-200 rounded-lg p-4 sm:p-5 space-y-3 sm:space-y-4">
-        <div className="flex items-center justify-between">
-          <h2 className="text-base sm:text-lg font-semibold text-gray-900">
+      <div className="bg-white border border-gray-200 rounded-xl p-4 sm:p-5 shadow-[0_1px_0_var(--color-gray-200),0_8px_20px_-14px_oklch(0.27_0.06_162/0.3)] space-y-4">
+        <div className="flex items-center justify-between gap-2">
+          <h2 className="text-lg sm:text-xl font-bold text-gray-900">
             {hasExistingAttendance ? "Cập Nhật Điểm Danh" : "Điểm Danh"}
           </h2>
           {hasExistingAttendance && existingAttendance && (
@@ -655,10 +667,10 @@ export const MatchAttendance: React.FC = () => {
         )}
 
         <div className="space-y-3">
-          <div className="space-y-2">
+          <div className="grid grid-cols-3 gap-2">
             {(["Attending", "NotGoing", "Tentative"] as AttendanceStatus[]).map(
               (s) => (
-                <div key={s} className="flex items-center space-x-3">
+                <div key={s} className="relative">
                   <input
                     type="radio"
                     id={`status-${s}`}
@@ -666,33 +678,27 @@ export const MatchAttendance: React.FC = () => {
                     value={s}
                     checked={status === s}
                     onChange={() => handleStatusChange(s)}
-                    className={`h-4 w-4 border-2 ${
-                      s === "Attending"
-                        ? "text-green-600 border-green-300 focus:ring-green-500"
-                        : s === "NotGoing"
-                        ? "text-red-600 border-red-300 focus:ring-red-500"
-                        : "text-yellow-500 border-yellow-300 focus:ring-yellow-500"
-                    }`}
+                    className="peer sr-only"
                   />
                   <Label
                     htmlFor={`status-${s}`}
-                    className={`text-sm sm:text-base cursor-pointer flex items-center gap-2 ${
+                    className={`flex h-full min-h-[88px] cursor-pointer flex-col items-center justify-center gap-1.5 rounded-lg border-2 px-1.5 py-3 text-center text-[0.8rem] sm:text-sm font-semibold leading-tight transition-all peer-focus-visible:ring-[3px] peer-focus-visible:ring-ring/50 active:scale-[0.98] ${
                       status === s
                         ? s === "Attending"
-                          ? "text-green-700 font-medium"
+                          ? "border-green-600 bg-green-50 text-green-800 shadow-[inset_0_-4px_0_var(--color-green-600)]"
                           : s === "NotGoing"
-                          ? "text-red-700 font-medium"
-                          : "text-yellow-700 font-medium"
-                        : "text-gray-700"
+                          ? "border-red-500 bg-red-50 text-red-700 shadow-[inset_0_-4px_0_var(--color-red-500)]"
+                          : "border-amber-400 bg-amber-50 text-amber-800 shadow-[inset_0_-4px_0_var(--color-amber-400)]"
+                        : "border-gray-200 bg-white text-gray-600 hover:border-gray-300 hover:bg-gray-50"
                     }`}
                   >
                     <span
-                      className={`text-lg ${
+                      className={`font-display text-3xl font-bold leading-none ${
                         s === "Attending"
                           ? "text-green-600"
                           : s === "NotGoing"
                           ? "text-red-600"
-                          : "text-yellow-500"
+                          : "text-amber-500"
                       }`}
                     >
                       {s === "Attending" ? "✓" : s === "NotGoing" ? "✗" : "?"}
@@ -783,11 +789,11 @@ export const MatchAttendance: React.FC = () => {
             isSubmitting ||
             isAttendanceDisabled
           }
-          className="w-full text-sm sm:text-base py-3"
+          className="w-full h-12 bg-floodlight font-display text-lg uppercase tracking-wide text-pitch-deep shadow-[inset_0_-3px_0_rgb(0_0_0/0.12)] hover:bg-floodlight/90"
         >
           {isSubmitting ? (
             <div className="flex items-center gap-2">
-              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-pitch-deep"></div>
               {hasExistingAttendance ? "Đang cập nhật..." : "Đang lưu..."}
             </div>
           ) : isAttendanceDisabled ? (
@@ -801,11 +807,11 @@ export const MatchAttendance: React.FC = () => {
       </div>
 
       {/* Quick Guide - Secondary Info */}
-      <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 sm:p-4">
-        <h2 className="font-medium text-blue-900 mb-2 text-sm sm:text-base">
+      <div className="bg-white border border-gray-200 rounded-xl p-4">
+        <h2 className="kit-label text-blue-700 mb-2">
           Hướng Dẫn Nhanh
         </h2>
-        <div className="text-xs sm:text-sm text-blue-800 space-y-1">
+        <div className="text-xs sm:text-sm text-gray-700 space-y-1.5 [&_strong]:text-gray-900">
           <p>
             <strong>1 (Tham Gia):</strong> Tôi sẽ đến chơi
           </p>
@@ -833,12 +839,11 @@ export const MatchAttendance: React.FC = () => {
 
       {/* Attendance Rules - Important Info */}
       {matchInfo && (
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 sm:p-4">
-          <h2 className="font-medium text-blue-900 mb-3 text-sm sm:text-base flex items-center gap-2">
-            <span>📋</span>
+        <div className="bg-white border border-gray-200 rounded-xl p-4">
+          <h2 className="kit-label text-blue-700 mb-3">
             Thời Hạn Điểm Danh
           </h2>
-          <div className="text-xs sm:text-sm text-blue-800 space-y-2">
+          <div className="text-xs sm:text-sm text-gray-700 space-y-2">
             {(() => {
               const matchTime = new Date(matchInfo.dateTime);
               const officialDeadline = new Date(
@@ -850,8 +855,8 @@ export const MatchAttendance: React.FC = () => {
 
               return (
                 <div className="space-y-2">
-                  <div className="bg-white rounded-lg p-3 border border-blue-200">
-                    <p className="font-medium text-blue-900 mb-1">
+                  <div className="bg-blue-50 rounded-lg p-3 border border-blue-100">
+                    <p className="font-semibold text-blue-900 mb-1">
                       ⏰ Điểm danh chính thức
                     </p>
                     <p className="text-blue-800">
@@ -866,8 +871,8 @@ export const MatchAttendance: React.FC = () => {
                       })}
                     </p>
                   </div>
-                  <div className="bg-white rounded-lg p-3 border border-blue-200">
-                    <p className="font-medium text-blue-900 mb-1">
+                  <div className="bg-blue-50 rounded-lg p-3 border border-blue-100">
+                    <p className="font-semibold text-blue-900 mb-1">
                       📢 Thông báo đến muộn
                     </p>
                     <p className="text-blue-800">
@@ -890,19 +895,28 @@ export const MatchAttendance: React.FC = () => {
       )}
 
       {/* Penalty Information - Separate Section */}
-      <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 sm:p-4">
-        <h2 className="font-medium text-gray-900 mb-3 text-sm sm:text-base flex items-center gap-2">
-          <span>💰</span>
+      <div className="bg-white border border-gray-200 rounded-xl p-4">
+        <h2 className="kit-label text-blue-700 mb-3 flex items-center gap-2">
+          <span aria-hidden="true" className="flex gap-0.5">
+            <span className="inline-block h-4 w-3 -rotate-6 rounded-[2px] bg-yellow-400 shadow-sm" />
+            <span className="inline-block h-4 w-3 rotate-6 rounded-[2px] bg-red-600 shadow-sm" />
+          </span>
           Quy Định Phạt
         </h2>
         <div className="text-xs sm:text-sm text-gray-700 space-y-2">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="space-y-1">
-              <p className="font-medium text-gray-800">⏰ Phạt thời gian:</p>
+              <p className="font-semibold text-gray-900 flex items-center gap-2">
+                <span aria-hidden="true" className="inline-block h-3.5 w-2.5 rounded-[2px] bg-yellow-400" />
+                Phạt thời gian:
+              </p>
               <p>• Điểm danh muộn: 10.000 VND</p>
             </div>
             <div className="space-y-1">
-              <p className="font-medium text-gray-800">🚫 Phạt vi phạm:</p>
+              <p className="font-semibold text-gray-900 flex items-center gap-2">
+                <span aria-hidden="true" className="inline-block h-3.5 w-2.5 rounded-[2px] bg-red-600" />
+                Phạt vi phạm:
+              </p>
               <p>• Báo tham gia nhưng không đi: 50.000 VND</p>
               <p>• Đi muộn: 1.000 VND/phút</p>
             </div>
@@ -912,13 +926,13 @@ export const MatchAttendance: React.FC = () => {
 
       {/* Collapsible Attendance Status - Secondary Info */}
       {currentAttendance && (
-        <div className="bg-gray-50 border border-gray-200 rounded-lg">
+        <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
           <button
             onClick={() => setIsAttendanceExpanded(!isAttendanceExpanded)}
-            className="w-full p-3 sm:p-4 text-left flex items-center justify-between hover:bg-gray-100 transition-colors touch-manipulation"
+            className="w-full p-4 text-left flex items-center justify-between hover:bg-gray-50 transition-colors touch-manipulation"
           >
             <div>
-              <h2 className="font-medium text-gray-900 text-sm sm:text-base">
+              <h2 className="font-bold text-gray-900 text-lg">
                 Tình Hình Điểm Danh
                 {isRefreshing && (
                   <span className="ml-2 text-xs text-blue-600">
@@ -955,24 +969,24 @@ export const MatchAttendance: React.FC = () => {
           {isAttendanceExpanded && (
             <div className="px-3 sm:px-4 pb-3 sm:pb-4 space-y-3">
               {/* Summary Stats */}
-              <div className="grid grid-cols-3 gap-2 sm:gap-4 text-center">
-                <div className="bg-green-50 rounded-lg p-2 sm:p-3">
-                  <div className="text-lg sm:text-xl font-bold text-green-600">
+              <div className="scoreboard-panel grid grid-cols-3 gap-2 sm:gap-4 rounded-lg p-3 text-center">
+                <div className="p-1">
+                  <div className="text-3xl font-bold text-green-600">
                     {currentAttendance.summary.totalPlayers}
                   </div>
-                  <div className="text-xs text-green-800">Cầu Thủ</div>
+                  <div className="kit-label text-white/70">Cầu Thủ</div>
                 </div>
-                <div className="bg-blue-50 rounded-lg p-2 sm:p-3">
-                  <div className="text-lg sm:text-xl font-bold text-blue-600">
+                <div className="p-1 border-x border-white/10">
+                  <div className="text-3xl font-bold text-blue-600">
                     {currentAttendance.summary.totalGuests}
                   </div>
-                  <div className="text-xs text-blue-800">Khách</div>
+                  <div className="kit-label text-white/70">Khách</div>
                 </div>
-                <div className="bg-purple-50 rounded-lg p-2 sm:p-3">
-                  <div className="text-lg sm:text-xl font-bold text-purple-600">
+                <div className="p-1">
+                  <div className="text-3xl font-bold text-floodlight">
                     {currentAttendance.summary.totalAttending}
                   </div>
-                  <div className="text-xs text-purple-800">Tổng</div>
+                  <div className="kit-label text-white/70">Tổng</div>
                 </div>
               </div>
 
@@ -981,19 +995,21 @@ export const MatchAttendance: React.FC = () => {
                 (p) => p.status === "Attending"
               ).length > 0 && (
                 <div className="space-y-2">
-                  <h3 className="font-medium text-gray-900 text-xs sm:text-sm">
+                  <h3 className="kit-label text-gray-600">
                     Danh Sách Tham Gia:
                   </h3>
-                  <div className="max-h-32 sm:max-h-40 overflow-y-auto space-y-1">
+                  <div className="max-h-48 sm:max-h-56 overflow-y-auto space-y-1">
                     {currentAttendance.attendance
                       .filter((player) => player.status === "Attending")
                       .map((player, index) => (
                         <div
                           key={index}
-                          className="flex items-center justify-between text-xs sm:text-sm bg-white rounded px-2 sm:px-3 py-1.5 sm:py-2 border"
+                          className="flex items-center justify-between text-sm bg-gray-50 rounded-md px-3 py-2 border border-gray-100"
                         >
-                          <div className="flex items-center gap-1.5 sm:gap-2 min-w-0 flex-1">
-                            <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-green-500 flex-shrink-0"></div>
+                          <div className="flex items-center gap-2 min-w-0 flex-1">
+                            <span className="scoreboard w-5 shrink-0 text-center text-blue-700">
+                              {index + 1}
+                            </span>
                             <span className="font-medium truncate">
                               {player.playerName}
                             </span>

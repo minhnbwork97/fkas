@@ -1,4 +1,5 @@
 "use client";
+import { PitchMarkings } from "@/components/PitchMarkings";
 import { useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -254,7 +255,7 @@ export default function MatchPaymentPage() {
             <Skeleton className="h-4 w-64" />
 
             {/* Settlement info skeleton */}
-            <div className="p-3 bg-gray-50 rounded border space-y-2">
+            <div className="scoreboard-panel rounded-xl p-4 space-y-2">
               <div className="flex justify-between">
                 <Skeleton className="h-4 w-32" />
                 <Skeleton className="h-4 w-24" />
@@ -266,7 +267,7 @@ export default function MatchPaymentPage() {
             </div>
 
             {/* Player balance skeleton */}
-            <div className="p-3 bg-blue-50 rounded border border-blue-200">
+            <div className="px-4 py-3 bg-blue-50 rounded-xl border border-blue-100">
               <div className="flex justify-between items-center">
                 <Skeleton className="h-4 w-32" />
                 <Skeleton className="h-4 w-20" />
@@ -274,7 +275,7 @@ export default function MatchPaymentPage() {
             </div>
 
             {/* QR Code section skeleton */}
-            <div className="p-4 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-lg border-2 border-blue-200">
+            <div className="p-4 bg-white rounded-xl border-2 border-dashed border-blue-200">
               <div className="flex flex-col items-center space-y-3">
                 <div className="flex items-center justify-center gap-2">
                   <Skeleton className="h-5 w-5" />
@@ -309,17 +310,21 @@ export default function MatchPaymentPage() {
   );
 
   return (
-    <main className="max-w-xl mx-auto p-6 space-y-4">
-      <Card>
-        <CardHeader>
-          <CardTitle>Thanh Toán Sau Trận Đấu</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-2">
+    <main className="max-w-xl mx-auto p-4 sm:p-6 space-y-4">
+      <Card className="overflow-hidden pt-0 gap-5">
+        <CardHeader className="pitch-surface relative overflow-hidden py-6 border-b-4 border-floodlight">
+          <PitchMarkings className="text-white/20" />
+          <p className="relative kit-label text-floodlight">FC Không Giải Tán</p>
+          <CardTitle className="relative text-2xl sm:text-3xl uppercase text-white">
+            Thanh Toán Sau Trận Đấu
+          </CardTitle>
           {matchInfo && (
-            <p className="text-sm text-gray-600">
+            <p className="relative scoreboard text-lg text-white/85">
               Trận: {new Date(matchInfo.dateTime).toLocaleString("vi-VN")}
             </p>
           )}
+        </CardHeader>
+        <CardContent className="space-y-3">
           {error && <p className="text-sm text-red-600">{error}</p>}
           {!playerId && (
             <div className="">
@@ -346,15 +351,15 @@ export default function MatchPaymentPage() {
           )}
           {isLoadingPaymentInfo ? (
             <div className="space-y-3">
-              <div className="p-3 bg-gray-50 rounded border">
+              <div className="scoreboard-panel rounded-xl px-4 py-5">
                 <div className="flex justify-between">
                   <span>Số tiền cần đóng</span>
                   <span className="font-semibold">...</span>
                 </div>
-                <div className="mt-1 text-gray-500 text-sm">Đang tải...</div>
+                <div className="mt-1 text-white/60 text-sm">Đang tải...</div>
               </div>
 
-              <div className="p-3 bg-blue-50 rounded border border-blue-200">
+              <div className="px-4 py-3 bg-blue-50 rounded-xl border border-blue-100">
                 <div className="flex justify-between items-center">
                   <span className="text-sm text-blue-900">
                     Số dư quỹ hiện tại
@@ -363,7 +368,7 @@ export default function MatchPaymentPage() {
                 </div>
               </div>
 
-              <div className="p-4 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-lg border-2 border-blue-200">
+              <div className="p-4 bg-white rounded-xl border-2 border-dashed border-blue-200">
                 <div className="flex flex-col items-center space-y-3">
                   <div className="bg-white p-3 rounded-lg inline-block shadow-sm">
                     <div className="w-64 h-64 mx-auto bg-gray-100 animate-pulse" />
@@ -374,20 +379,20 @@ export default function MatchPaymentPage() {
             </div>
           ) : mySettlement ? (
             <div className="space-y-3">
-              <div className="p-3 bg-gray-50 rounded border">
-                <div className="flex justify-between">
-                  <span>Số tiền cần đóng</span>
-                  <span className="font-semibold">
+              <div className="scoreboard-panel rounded-xl px-4 py-5 text-center">
+                <div className="flex flex-col items-center gap-1">
+                  <span className="kit-label text-white/70">Số tiền cần đóng</span>
+                  <span className="text-4xl sm:text-5xl font-bold text-white">
                     {mySettlement.amount.toLocaleString("vi-VN")} VND
                   </span>
                 </div>
-                <div className="mt-1">
+                <div className="mt-3 text-sm text-white/70">
                   Trạng thái:{" "}
                   <span
                     className={
                       mySettlement.paid
-                        ? "text-green-600 font-medium"
-                        : "text-orange-600 font-medium"
+                        ? "ml-1 inline-flex rounded-full bg-white/10 px-2.5 py-0.5 text-green-600 font-semibold"
+                        : "ml-1 inline-flex rounded-full bg-white/10 px-2.5 py-0.5 text-orange-600 font-semibold"
                     }
                   >
                     {mySettlement.paid ? "Đã thanh toán" : "Chưa thanh toán"}
@@ -397,13 +402,13 @@ export default function MatchPaymentPage() {
 
               {/* Fund balance display */}
               {typeof playerBalance === "number" && (
-                <div className="p-3 bg-blue-50 rounded border border-blue-200">
+                <div className="px-4 py-3 bg-blue-50 rounded-xl border border-blue-100">
                   <div className="flex justify-between items-center">
                     <span className="text-sm text-blue-900">
                       Số dư quỹ hiện tại
                     </span>
                     <span
-                      className={`font-semibold ${
+                      className={`scoreboard text-xl ${
                         playerBalance >= 0 ? "text-blue-700" : "text-red-600"
                       }`}
                     >
@@ -417,9 +422,9 @@ export default function MatchPaymentPage() {
                 <div className="space-y-4">
                   {/* QR Code Section */}
                   {mySettlement.qrCodeUrl && (
-                  <div className="p-4 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-lg border-2 border-blue-200">
+                  <div className="p-4 bg-white rounded-xl border-2 border-dashed border-blue-200">
                     <div className="flex flex-col items-center space-y-3">
-                        <div className="flex items-center justify-center gap-2 text-blue-900 font-semibold">
+                        <div className="kit-label flex items-center justify-center gap-2 text-sm text-blue-800">
                           <svg
                             className="w-5 h-5"
                             fill="none"
@@ -436,7 +441,7 @@ export default function MatchPaymentPage() {
                           <span>Quét mã QR để thanh toán</span>
                         </div>
 
-                        <div className="bg-white p-3 rounded-lg inline-block shadow-sm">
+                        <div className="bg-white p-3 rounded-lg inline-block ring-1 ring-gray-200 shadow-[0_10px_24px_-14px_oklch(0.27_0.06_162/0.45)]">
                           {/* eslint-disable-next-line @next/next/no-img-element */}
                           <img
                             src={mySettlement.qrCodeUrl}
@@ -445,11 +450,11 @@ export default function MatchPaymentPage() {
                           />
                         </div>
 
-                        <div className="text-sm space-y-1">
-                          <p className="text-blue-800">
+                        <div className="text-sm space-y-1 text-center">
+                          <p className="font-medium text-gray-800">
                             💳 Mở app ngân hàng → Quét QR → Thanh toán
                           </p>
-                          <p className="text-xs text-blue-600">
+                          <p className="text-xs text-gray-500">
                             Sau khi thanh toán, nhấn nút xác nhận bên dưới
                           </p>
                         </div>
@@ -467,7 +472,7 @@ export default function MatchPaymentPage() {
                     <Button
                       onClick={handleSelfReportPayment}
                       disabled={isReporting}
-                      className="w-full"
+                      className="w-full h-12 bg-floodlight font-display text-lg uppercase tracking-wide text-pitch-deep shadow-[inset_0_-3px_0_rgb(0_0_0/0.12)] hover:bg-floodlight/90"
                     >
                       {isReporting ? "Đang báo cáo..." : "Tôi đã thanh toán"}
                     </Button>
@@ -476,8 +481,8 @@ export default function MatchPaymentPage() {
               )}
 
               {mySettlement.paid && (
-                <div className="p-3 bg-green-50 border border-green-200 rounded space-y-2">
-                  <p className="text-sm text-green-700 font-medium">
+                <div className="p-4 bg-green-50 border border-green-200 rounded-xl space-y-2">
+                  <p className="text-base text-green-800 font-semibold">
                     ✓ Cảm ơn bạn đã báo cáo thanh toán.
                   </p>
                   <p className="text-sm text-green-700">

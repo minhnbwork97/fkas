@@ -6,7 +6,8 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
+  --font-sans: var(--font-body);
+  --font-display: var(--font-display-face);
   --font-mono: var(--font-geist-mono);
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
@@ -37,79 +38,165 @@
   --color-popover: var(--popover);
   --color-card-foreground: var(--card-foreground);
   --color-card: var(--card);
+  --color-pitch: var(--pitch);
+  --color-pitch-deep: var(--pitch-deep);
+  --color-floodlight: var(--floodlight);
+  --color-chalk: var(--chalk);
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
 }
 
+/*
+ * Matchday palette. Pages use raw Tailwind scales (gray/blue/green/purple),
+ * so those scales are re-tuned here to restyle the app without touching markup:
+ *   gray   -> turf neutrals (faint green cast)
+ *   blue   -> pitch green (club colour)
+ *   green  -> bright "goal" green for success, pushed toward lime to stay
+ *             distinct from the pitch
+ *   purple/indigo -> away-kit navy
+ * amber, yellow, orange and red keep their meaning as warnings and errors.
+ */
+@theme {
+  --color-gray-50: oklch(0.975 0.006 130);
+  --color-gray-100: oklch(0.948 0.009 135);
+  --color-gray-200: oklch(0.905 0.012 140);
+  --color-gray-300: oklch(0.85 0.014 145);
+  --color-gray-400: oklch(0.7 0.016 150);
+  --color-gray-500: oklch(0.56 0.018 155);
+  --color-gray-600: oklch(0.45 0.019 158);
+  --color-gray-700: oklch(0.37 0.019 160);
+  --color-gray-800: oklch(0.28 0.017 160);
+  --color-gray-900: oklch(0.21 0.016 162);
+  --color-gray-950: oklch(0.15 0.012 162);
+
+  --color-blue-50: oklch(0.972 0.018 165);
+  --color-blue-100: oklch(0.942 0.038 165);
+  --color-blue-200: oklch(0.885 0.068 165);
+  --color-blue-300: oklch(0.8 0.098 164);
+  --color-blue-400: oklch(0.68 0.118 163);
+  --color-blue-500: oklch(0.56 0.12 162);
+  --color-blue-600: oklch(0.465 0.108 161);
+  --color-blue-700: oklch(0.395 0.094 161);
+  --color-blue-800: oklch(0.33 0.078 161);
+  --color-blue-900: oklch(0.27 0.06 162);
+  --color-blue-950: oklch(0.19 0.044 162);
+
+  --color-green-50: oklch(0.977 0.03 132);
+  --color-green-100: oklch(0.95 0.06 132);
+  --color-green-200: oklch(0.905 0.11 133);
+  --color-green-300: oklch(0.845 0.15 134);
+  --color-green-400: oklch(0.77 0.18 135);
+  --color-green-500: oklch(0.68 0.18 137);
+  --color-green-600: oklch(0.575 0.16 139);
+  --color-green-700: oklch(0.485 0.13 140);
+  --color-green-800: oklch(0.405 0.104 141);
+  --color-green-900: oklch(0.345 0.082 142);
+  --color-green-950: oklch(0.235 0.06 144);
+
+  --color-purple-50: oklch(0.972 0.012 262);
+  --color-purple-100: oklch(0.938 0.026 262);
+  --color-purple-200: oklch(0.88 0.05 263);
+  --color-purple-300: oklch(0.79 0.08 264);
+  --color-purple-400: oklch(0.66 0.11 265);
+  --color-purple-500: oklch(0.54 0.13 266);
+  --color-purple-600: oklch(0.44 0.13 267);
+  --color-purple-700: oklch(0.375 0.115 267);
+  --color-purple-800: oklch(0.315 0.095 267);
+  --color-purple-900: oklch(0.265 0.075 267);
+  --color-purple-950: oklch(0.19 0.055 268);
+
+  --color-indigo-50: oklch(0.972 0.012 262);
+  --color-indigo-100: oklch(0.938 0.026 262);
+  --color-indigo-200: oklch(0.88 0.05 263);
+  --color-indigo-300: oklch(0.79 0.08 264);
+  --color-indigo-400: oklch(0.66 0.11 265);
+  --color-indigo-500: oklch(0.54 0.13 266);
+  --color-indigo-600: oklch(0.44 0.13 267);
+  --color-indigo-700: oklch(0.375 0.115 267);
+  --color-indigo-800: oklch(0.315 0.095 267);
+  --color-indigo-900: oklch(0.265 0.075 267);
+  --color-indigo-950: oklch(0.19 0.055 268);
+}
+
 :root {
-  --radius: 0.625rem;
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
+  --radius: 0.5rem;
+
+  /* Named matchday colours */
+  --pitch: oklch(0.395 0.094 161);
+  --pitch-deep: oklch(0.27 0.06 162);
+  --pitch-stripe: oklch(0.43 0.1 158);
+  --floodlight: oklch(0.86 0.165 92);
+  --chalk: oklch(0.99 0.004 120);
+  --turf: oklch(0.962 0.009 132);
+  --turf-stripe: oklch(0.953 0.01 134);
+
+  --background: var(--turf);
+  --foreground: oklch(0.21 0.016 162);
   --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
+  --card-foreground: oklch(0.21 0.016 162);
   --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.646 0.222 41.116);
-  --chart-2: oklch(0.6 0.118 184.704);
-  --chart-3: oklch(0.398 0.07 227.392);
-  --chart-4: oklch(0.828 0.189 84.429);
-  --chart-5: oklch(0.769 0.188 70.08);
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+  --popover-foreground: oklch(0.21 0.016 162);
+  --primary: var(--pitch);
+  --primary-foreground: var(--chalk);
+  --secondary: oklch(0.935 0.022 150);
+  --secondary-foreground: var(--pitch-deep);
+  --muted: oklch(0.94 0.01 140);
+  --muted-foreground: oklch(0.47 0.019 158);
+  --accent: oklch(0.942 0.038 165);
+  --accent-foreground: var(--pitch-deep);
+  --destructive: oklch(0.56 0.215 27);
+  --border: oklch(0.89 0.014 145);
+  --input: oklch(0.86 0.016 148);
+  --ring: oklch(0.56 0.12 162);
+  --chart-1: var(--pitch);
+  --chart-2: oklch(0.86 0.165 92);
+  --chart-3: oklch(0.44 0.13 267);
+  --chart-4: oklch(0.68 0.18 137);
+  --chart-5: oklch(0.56 0.215 27);
+  --sidebar: var(--pitch-deep);
+  --sidebar-foreground: var(--chalk);
+  --sidebar-primary: var(--floodlight);
+  --sidebar-primary-foreground: var(--pitch-deep);
+  --sidebar-accent: oklch(0.33 0.078 161);
+  --sidebar-accent-foreground: var(--chalk);
+  --sidebar-border: oklch(1 0 0 / 12%);
+  --sidebar-ring: var(--floodlight);
 }
 
 .dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
+  --background: oklch(0.17 0.02 162);
+  --foreground: oklch(0.97 0.006 130);
+  --card: oklch(0.22 0.024 162);
+  --card-foreground: oklch(0.97 0.006 130);
+  --popover: oklch(0.22 0.024 162);
+  --popover-foreground: oklch(0.97 0.006 130);
+  --primary: var(--floodlight);
+  --primary-foreground: var(--pitch-deep);
+  --secondary: oklch(0.28 0.03 162);
+  --secondary-foreground: oklch(0.97 0.006 130);
+  --muted: oklch(0.28 0.03 162);
+  --muted-foreground: oklch(0.72 0.016 150);
+  --accent: oklch(0.3 0.05 161);
+  --accent-foreground: oklch(0.97 0.006 130);
+  --destructive: oklch(0.7 0.19 22);
   --border: oklch(1 0 0 / 10%);
   --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.488 0.243 264.376);
-  --chart-2: oklch(0.696 0.17 162.48);
-  --chart-3: oklch(0.769 0.188 70.08);
-  --chart-4: oklch(0.627 0.265 303.9);
-  --chart-5: oklch(0.645 0.246 16.439);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
+  --ring: var(--floodlight);
+  --chart-1: oklch(0.68 0.118 163);
+  --chart-2: var(--floodlight);
+  --chart-3: oklch(0.66 0.11 265);
+  --chart-4: oklch(0.77 0.18 135);
+  --chart-5: oklch(0.7 0.19 22);
+  --sidebar: oklch(0.22 0.024 162);
+  --sidebar-foreground: oklch(0.97 0.006 130);
+  --sidebar-primary: var(--floodlight);
+  --sidebar-primary-foreground: var(--pitch-deep);
+  --sidebar-accent: oklch(0.3 0.05 161);
+  --sidebar-accent-foreground: oklch(0.97 0.006 130);
   --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
+  --sidebar-ring: var(--floodlight);
 }
 
 @layer base {
@@ -119,7 +206,205 @@
 
   body {
     @apply bg-background text-foreground;
+    /* Faint mowing stripes: the whole app sits on the pitch. */
+    background-image: repeating-linear-gradient(
+      90deg,
+      var(--turf) 0 72px,
+      var(--turf-stripe) 72px 144px
+    );
+    background-attachment: fixed;
   }
+
+  /* Stadium-signage headings */
+  h1,
+  h2,
+  h3,
+  [data-slot="card-title"] {
+    font-family: var(--font-display);
+    letter-spacing: 0.005em;
+  }
+
+  h1 {
+    text-transform: uppercase;
+    font-weight: 800;
+    letter-spacing: 0.01em;
+    line-height: 1.02;
+    color: var(--pitch-deep);
+  }
+
+  h2,
+  [data-slot="card-title"] {
+    font-weight: 700;
+  }
+
+  ::selection {
+    background: var(--floodlight);
+    color: var(--pitch-deep);
+  }
+}
+
+@layer components {
+  /* Mown pitch surface used for headers and hero bands */
+  .pitch-surface {
+    background-color: var(--pitch);
+    background-image:
+      radial-gradient(
+        ellipse 38% 90% at 8% -20%,
+        oklch(0.95 0.08 95 / 0.22),
+        transparent 70%
+      ),
+      radial-gradient(
+        ellipse 38% 90% at 92% -20%,
+        oklch(0.95 0.08 95 / 0.22),
+        transparent 70%
+      ),
+      repeating-linear-gradient(
+        90deg,
+        var(--pitch) 0 56px,
+        var(--pitch-stripe) 56px 112px
+      );
+    color: var(--chalk);
+  }
+
+  /*
+   * Stadium scoreboard. Re-points the colour tokens inside it, so the
+   * existing text-green-600 / text-red-600 / text-gray-600 classes in the
+   * stat blocks light up against the dark board without markup changes.
+   */
+  .scoreboard-panel {
+    --card: var(--pitch-deep);
+    --card-foreground: var(--chalk);
+    --border: oklch(1 0 0 / 0.08);
+    --color-gray-50: oklch(1 0 0 / 0.04);
+    --color-gray-600: oklch(0.86 0.02 150);
+    --color-gray-900: var(--chalk);
+    --color-green-500: oklch(0.86 0.2 135);
+    --color-green-600: oklch(0.86 0.2 135);
+    --color-blue-600: oklch(0.86 0.1 165);
+    --color-red-500: oklch(0.72 0.19 25);
+    --color-red-600: oklch(0.76 0.17 25);
+    --color-orange-600: oklch(0.8 0.15 60);
+    --color-purple-600: oklch(0.82 0.08 265);
+    position: relative;
+    background-color: var(--pitch-deep);
+    background-image:
+      radial-gradient(oklch(1 0 0 / 0.06) 1px, transparent 1.2px),
+      linear-gradient(180deg, oklch(1 0 0 / 0.05), transparent 40%);
+    background-size: 6px 6px, 100% 100%;
+    color: var(--chalk);
+    border-color: oklch(1 0 0 / 0.08);
+    box-shadow:
+      inset 0 0 0 1px oklch(1 0 0 / 0.04),
+      0 -3px 0 var(--floodlight) inset,
+      0 10px 24px -14px oklch(0.27 0.06 162 / 0.6);
+  }
+
+  .scoreboard-panel :is(p, span, div).font-bold {
+    font-family: var(--font-display);
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.02em;
+    text-shadow: 0 0 16px color-mix(in oklch, currentColor 45%, transparent);
+  }
+
+  .scoreboard-panel p.text-2xl.font-bold {
+    font-size: 1.875rem;
+  }
+
+  .scoreboard-panel p.text-3xl.font-bold {
+    font-size: 2.5rem;
+    line-height: 1.1;
+  }
+
+  .scoreboard-panel p.text-sm {
+    font-family: var(--font-display);
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    font-size: 0.75rem;
+  }
+
+  /* Page titles get a floodlight underline */
+  main h1::after {
+    content: "";
+    display: block;
+    width: 2.75rem;
+    height: 4px;
+    margin-top: 0.45rem;
+    border-radius: 2px;
+    background: var(--floodlight);
+  }
+
+  main :is(.text-center > h1, h1.text-center)::after {
+    margin-inline: auto;
+  }
+
+  /* Clickable cards (match list) */
+  a > [data-slot="card"] {
+    transition:
+      transform 160ms ease,
+      box-shadow 160ms ease,
+      border-color 160ms ease;
+  }
+
+  a:hover > [data-slot="card"] {
+    transform: translateY(-2px);
+    border-color: var(--color-blue-300);
+    box-shadow:
+      inset 4px 0 0 var(--pitch),
+      0 12px 24px -16px oklch(0.27 0.06 162 / 0.45);
+  }
+
+  /* Sections arrive in order, like players walking out */
+  main > * {
+    animation: walkout 420ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  }
+
+  main > *:nth-child(2) { animation-delay: 50ms; }
+  main > *:nth-child(3) { animation-delay: 100ms; }
+  main > *:nth-child(4) { animation-delay: 150ms; }
+  main > *:nth-child(5) { animation-delay: 200ms; }
+  main > *:nth-child(n + 6) { animation-delay: 250ms; }
+
+  @keyframes walkout {
+    from {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    main > * {
+      animation: none;
+    }
+
+    a > [data-slot="card"] {
+      transition: none;
+    }
+
+    a:hover > [data-slot="card"] {
+      transform: none;
+    }
+  }
+}
+
+/* Scoreboard numerals for scores, money and counts */
+@utility scoreboard {
+  font-family: var(--font-display);
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
+/* Small all-caps label, like a programme or kit tag */
+@utility kit-label {
+  font-family: var(--font-display);
+  text-transform: uppercase;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  font-size: 0.75rem;
 }
 
 @layer utilities {
@@ -151,5 +436,12 @@
 
   .animate-pulse-slow {
     animation: pulse-slow 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .animate-fade-in,
+    .animate-pulse-slow {
+      animation: none;
+    }
   }
 }

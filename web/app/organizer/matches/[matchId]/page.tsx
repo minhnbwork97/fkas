@@ -394,7 +394,7 @@ export default function OrganizerEditMatchPage() {
           <CardContent>
             <div className="space-y-4">
               {/* Main Status - Large and Clear */}
-              <div className="text-center p-4 bg-gray-50 rounded-lg">
+              <div className="scoreboard-panel text-center p-5 rounded-lg">
                 <div className="flex items-center justify-center gap-3 mb-2">
                   <div
                     className={`w-3 h-3 rounded-full ${
