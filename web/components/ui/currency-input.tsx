@@ -103,6 +103,7 @@ export function CurrencyInput({
       // Allow: home, end, left, right
       ["Home", "End", "ArrowLeft", "ArrowRight"].includes(e.key)
     ) {
+      props.onKeyDown?.(e);
       return;
     }
 

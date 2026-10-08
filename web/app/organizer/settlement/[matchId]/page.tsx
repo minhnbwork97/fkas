@@ -7,6 +7,9 @@ import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { AutocompleteOption } from "@/components/ui/autocomplete";
+import { CurrencyInput } from "@/components/ui/currency-input";
+import { Pencil } from "lucide-react";
+import { toast } from "sonner";
 
 const PIN_KEY = "fkas_admin_pin";
 
@@ -48,6 +51,9 @@ export default function SettlementPage() {
 
   const [attendance, setAttendance] = useState<AttendanceActual[]>([]);
   const [fieldCost, setFieldCost] = useState<number>(600000);
+  const [isEditingFieldCost, setIsEditingFieldCost] = useState(false);
+  const [fieldCostDraft, setFieldCostDraft] = useState("");
+  const [isSavingFieldCost, setIsSavingFieldCost] = useState(false);
   const [summary, setSummary] = useState<SettlementSummary | null>(null);
   const [msg, setMsg] = useState("");
   const [isLoadingSettlement, setIsLoadingSettlement] = useState(false);
@@ -291,6 +297,55 @@ export default function SettlementPage() {
     isLoadingSettlement,
     calculateSummary,
   ]);
+
+  function startEditingFieldCost() {
+    setFieldCostDraft(fieldCost.toString());
+    setIsEditingFieldCost(true);
+  }
+
+  async function saveFieldCost() {
+    const newFieldCost = parseInt(fieldCostDraft, 10);
+    if (!Number.isFinite(newFieldCost) || newFieldCost <= 0) {
+      toast.error("Chi phí sân phải lớn hơn 0");
+      return;
+    }
+    if (newFieldCost === fieldCost) {
+      setIsEditingFieldCost(false);
+      return;
+    }
+
+    setIsSavingFieldCost(true);
+    try {
+      const pin = localStorage.getItem(PIN_KEY) || "";
+      const res = await fetch(`/api/matches/${matchId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ adminPin: pin, fieldCost: newFieldCost }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        toast.error(data.error || `Lỗi ${res.status}`);
+        return;
+      }
+
+      setFieldCost(newFieldCost);
+      setIsEditingFieldCost(false);
+      // Amounts were split using the old cost; require a fresh calculation
+      // before the settlement can be confirmed.
+      if (summary) {
+        setSummary(null);
+        toast.success(
+          "Đã cập nhật chi phí sân. Bấm Tính Toán để cập nhật số tiền."
+        );
+      } else {
+        toast.success("Đã cập nhật chi phí sân");
+      }
+    } catch {
+      toast.error("Lỗi kết nối. Vui lòng thử lại.");
+    } finally {
+      setIsSavingFieldCost(false);
+    }
+  }
 
   async function calculateSummary() {
     const customAttended = customParticipants; // All custom participants are considered attended
@@ -756,20 +811,70 @@ export default function SettlementPage() {
         </CardHeader>
         <CardContent>
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div className="flex items-center gap-2">
-              <span className="text-sm font-medium text-gray-700">Chi phí sân:</span>
-              <span className="text-lg font-semibold text-blue-600">
-                {fieldCost.toLocaleString("vi-VN")} VND
-              </span>
-              {matchStatus === "Settled" && (
-                <Badge variant="default" className="ml-0 sm:ml-2 bg-green-600">✓ Đã xác nhận thanh toán</Badge>
-              )}
-            </div>
+            {isEditingFieldCost ? (
+              <div className="flex flex-col sm:flex-row sm:items-center gap-2 flex-1">
+                <span className="text-sm font-medium text-gray-700">Chi phí sân:</span>
+                <CurrencyInput
+                  value={fieldCostDraft}
+                  onValueChange={setFieldCostDraft}
+                  placeholder="Chi phí sân"
+                  className="sm:max-w-56"
+                  disabled={isSavingFieldCost}
+                  autoFocus
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") saveFieldCost();
+                    if (e.key === "Escape") setIsEditingFieldCost(false);
+                  }}
+                />
+                <div className="flex gap-2">
+                  <Button
+                    size="sm"
+                    onClick={saveFieldCost}
+                    disabled={isSavingFieldCost}
+                  >
+                    {isSavingFieldCost ? "Đang lưu..." : "Lưu"}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setIsEditingFieldCost(false)}
+                    disabled={isSavingFieldCost}
+                  >
+                    Hủy
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-sm font-medium text-gray-700">Chi phí sân:</span>
+                <span className="scoreboard text-2xl text-blue-700">
+                  {fieldCost.toLocaleString("vi-VN")} VND
+                </span>
+                {matchStatus !== "Settled" && (
+                  <Button
+                    size="icon-sm"
+                    variant="ghost"
+                    onClick={startEditingFieldCost}
+                    aria-label="Sửa chi phí sân"
+                    title="Sửa chi phí sân"
+                  >
+                    <Pencil />
+                  </Button>
+                )}
+                {matchStatus === "Settled" && (
+                  <Badge variant="default" className="ml-0 sm:ml-2 bg-green-600">✓ Đã xác nhận thanh toán</Badge>
+                )}
+              </div>
+            )}
             <div className="flex gap-2 flex-wrap justify-end">
               <Button
                 size="sm"
                 onClick={calculateSummary}
-                disabled={isLoadingSettlement || matchStatus === "Settled"}
+                disabled={
+                  isLoadingSettlement ||
+                  isEditingFieldCost ||
+                  matchStatus === "Settled"
+                }
               >
                 {isLoadingSettlement ? "Đang tính..." : "Tính Toán"}
               </Button>
@@ -777,7 +882,7 @@ export default function SettlementPage() {
                 <Button
                   size="sm"
                   onClick={confirmSettlement}
-                  disabled={isConfirmingSettlement}
+                  disabled={isConfirmingSettlement || isEditingFieldCost}
                   variant="default"
                   className="bg-green-600 hover:bg-green-700"
                 >
