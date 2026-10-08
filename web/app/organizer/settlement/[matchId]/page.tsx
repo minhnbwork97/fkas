@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { AutocompleteOption } from "@/components/ui/autocomplete";
+import { planSettlement } from "@/src/lib/settlement";
 import { CurrencyInput } from "@/components/ui/currency-input";
 import { Pencil } from "lucide-react";
 import { toast } from "sonner";
@@ -75,6 +76,9 @@ export default function SettlementPage() {
   const [isLoadingPlayers, setIsLoadingPlayers] = useState(false);
   const [hasAutoCalculated, setHasAutoCalculated] = useState(false);
   const [isDataLoaded, setIsDataLoaded] = useState(false);
+  const [isAttendanceLoaded, setIsAttendanceLoaded] = useState(false);
+  const [hasCheckedSavedSettlement, setHasCheckedSavedSettlement] =
+    useState(false);
 
   useEffect(() => {
     const pin = localStorage.getItem(PIN_KEY);
@@ -118,7 +122,8 @@ export default function SettlementPage() {
               setAttendance(attendanceData);
             }
           })
-          .catch(() => {});
+          .catch(() => {})
+          .finally(() => setIsAttendanceLoaded(true));
 
         // Load match field cost and existing settlements/custom attendees
         fetch(`/api/matches/${matchId}`)
@@ -156,6 +161,7 @@ export default function SettlementPage() {
                           playerName: s.player?.name ?? s.custom?.name ?? "",
                           amount: s.amount,
                           paid: s.paid,
+                          isCustom: !!s.customId,
                         })
                       );
 
@@ -245,42 +251,73 @@ export default function SettlementPage() {
     }
   }, [router, matchId]);
 
-  // Recalculate summary when attendance data changes (fixes initial load calculation bug)
+  // A saved settlement can go stale when the attendance list changes after it
+  // was calculated (e.g. someone registers late). Check once after loading;
+  // if it no longer matches, drop it so it gets recalculated before anyone
+  // can confirm it.
   useEffect(() => {
-    if (summary && attendance.length > 0) {
-      // Recalculate total attended properly using actual attendance data
-      const totalAttendedFromData =
-        attendance.filter((a) => a.memberAttended).length + // Members who actually attended
-        attendance.reduce((sum, a) => sum + a.guestsAttended, 0) + // Their actual guests who attended
-        customParticipants.length + // Custom participants
-        customParticipants.reduce((sum, a) => sum + a.guestCount, 0); // Custom participants' guests
-
-      const actualTotalAttended = Math.max(totalAttendedFromData, 1); // Ensure at least 1
-
-      // Only update if the calculation is different from current summary
-      if (actualTotalAttended !== summary.totalAttended) {
-        setSummary((prev) =>
-          prev
-            ? {
-                ...prev,
-                totalAttended: actualTotalAttended,
-                perPersonCost: Math.floor(prev.fieldCost / actualTotalAttended),
-                remainder:
-                  prev.fieldCost -
-                  Math.floor(prev.fieldCost / actualTotalAttended) *
-                    actualTotalAttended,
-              }
-            : null
-        );
-      }
+    if (
+      hasCheckedSavedSettlement ||
+      !isDataLoaded ||
+      !isAttendanceLoaded ||
+      isLoadingSettlement
+    ) {
+      return;
     }
-  }, [attendance, customParticipants, summary?.fieldCost, summary]); // Include summary to fix dependency warning
+    setHasCheckedSavedSettlement(true);
+    if (!summary || matchStatus === "Settled") return;
+
+    const plan = planSettlement(
+      fieldCost,
+      attendance,
+      customParticipants.map((p) =>
+        p.isExistingPlayer && p.playerId
+          ? { id: p.playerId, kind: "player" as const, guestCount: p.guestCount }
+          : { id: p.id, kind: "custom" as const, guestCount: p.guestCount }
+      )
+    );
+    const saved = new Map(
+      summary.transactions.map((t) => [t.playerId, t.amount])
+    );
+    const isStale =
+      plan.lines.length !== saved.size ||
+      plan.lines.some((l) => saved.get(l.id) !== l.amount);
+
+    if (isStale) {
+      setSummary(null);
+      setMsg(
+        "Danh sách tham gia đã thay đổi so với lần tính trước, đang tính lại..."
+      );
+    } else {
+      setSummary((prev) =>
+        prev
+          ? {
+              ...prev,
+              totalAttended: plan.totalAttended,
+              perPersonCost: plan.perPersonCost,
+              remainder: plan.remainder,
+            }
+          : prev
+      );
+    }
+  }, [
+    hasCheckedSavedSettlement,
+    isDataLoaded,
+    isAttendanceLoaded,
+    isLoadingSettlement,
+    summary,
+    matchStatus,
+    fieldCost,
+    attendance,
+    customParticipants,
+  ]);
 
   // Auto-calculate settlement on initial page load
   useEffect(() => {
     if (
       !hasAutoCalculated &&
       isDataLoaded &&
+      hasCheckedSavedSettlement &&
       attendance.length > 0 &&
       !summary &&
       !isLoadingSettlement
@@ -292,6 +329,7 @@ export default function SettlementPage() {
   }, [
     hasAutoCalculated,
     isDataLoaded,
+    hasCheckedSavedSettlement,
     attendance.length,
     summary,
     isLoadingSettlement,
@@ -348,41 +386,7 @@ export default function SettlementPage() {
   }
 
   async function calculateSummary() {
-    const customAttended = customParticipants; // All custom participants are considered attended
-
-    // Calculate total attended: members who attended + their actual guests + custom participants + their guests
-    const totalAttended =
-      attendance.filter((a) => a.memberAttended).length + // Members who actually attended
-      attendance.reduce((sum, a) => sum + a.guestsAttended, 0) + // Their actual guests who attended
-      customAttended.length + // Custom participants
-      customAttended.reduce((sum, a) => sum + a.guestCount, 0); // Custom participants' guests
-
-    const perPersonCost = Math.floor(fieldCost / totalAttended);
-    const remainder = fieldCost - perPersonCost * totalAttended;
-
-    const transactions = [
-      ...attendance.map((player) => ({
-        playerId: player.playerId,
-        playerName: player.playerName,
-        amount:
-          (player.memberAttended ? perPersonCost : 0) +
-          player.guestsAttended * perPersonCost, // Member cost only if they attended, plus actual guests
-        balanceBefore: 0, // Will be loaded from API
-        balanceAfter: 0,
-        paid: false, // Add payment tracking
-      })),
-      ...customAttended.map((participant) => ({
-        playerId: participant.id,
-        playerName: participant.name,
-        amount: perPersonCost + participant.guestCount * perPersonCost,
-        balanceBefore: 0,
-        balanceAfter: 0,
-        paid: false, // Add payment tracking
-      })),
-    ];
-
-    // Auto-save attendance data
-    setMsg("Đang lưu danh sách tham gia...");
+    setMsg("Đang tính toán...");
     try {
       const pin = localStorage.getItem(PIN_KEY) || "";
       const res = await fetch(`/api/matches/${matchId}/settlement`, {
@@ -390,17 +394,13 @@ export default function SettlementPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           adminPin: pin,
-          actualAttendees: attendance
-            .filter((a) => a.memberAttended)
-            .map((a) => a.playerId),
           fieldCost: fieldCost,
-          totalAttended: totalAttended,
           attendanceData: attendance.map((a) => ({
             playerId: a.playerId,
             memberAttended: a.memberAttended,
             guestsAttended: a.guestsAttended,
           })),
-          customParticipants: customAttended.map((p) => ({
+          customParticipants: customParticipants.map((p) => ({
             tempId: p.id,
             name: p.name,
             guestCount: p.guestCount,
@@ -416,81 +416,95 @@ export default function SettlementPage() {
         return;
       }
 
-      setMsg("Đã lưu danh sách tham gia!");
-      setTimeout(() => setMsg(""), 3000);
+      // The server owns the split; show exactly what it stored.
+      const s = data.summary as {
+        totalAttended: number;
+        fieldCost: number;
+        perPersonCost: number;
+        remainder: number;
+        transactions: Array<{
+          playerId: string;
+          playerName: string;
+          amount: number;
+          paid: boolean;
+          isCustom: boolean;
+        }>;
+      };
+      const transactions = s.transactions.map((t) => ({
+        ...t,
+        balanceBefore: 0,
+        balanceAfter: 0,
+      }));
+      setSummary({
+        totalAttended: s.totalAttended,
+        fieldCost: s.fieldCost,
+        perPersonCost: s.perPersonCost,
+        remainder: s.remainder,
+        totalAmount: transactions.reduce((sum, t) => sum + t.amount, 0),
+        paidAmount: transactions.reduce(
+          (sum, t) => sum + (t.paid ? t.amount : 0),
+          0
+        ),
+        transactions,
+      });
+
+      // Reload saved participants so newly added ones carry their real ids
+      await reloadCustomParticipants();
+
+      const changed = (data.paidAmountChanged ?? []) as Array<{
+        name: string;
+        paidAmount: number;
+        newAmount: number;
+      }>;
+      if (changed.length > 0) {
+        setMsg(
+          `⚠️ Số tiền đã thay đổi với người đã thanh toán: ${changed
+            .map(
+              (c) =>
+                `${c.name} (đã trả ${c.paidAmount.toLocaleString(
+                  "vi-VN"
+                )}, nay ${c.newAmount.toLocaleString("vi-VN")} VND)`
+            )
+            .join("; ")}. Hãy kiểm tra và điều chỉnh với họ.`
+        );
+      } else {
+        setMsg("Đã tính toán và lưu!");
+        setTimeout(() => setMsg(""), 3000);
+      }
     } catch {
       setMsg("Lỗi kết nối. Vui lòng thử lại.");
-      return;
     }
+  }
 
-    // Prefer backend-calculated summary (ensures custom participants mapped to real playerIds)
+  async function reloadCustomParticipants() {
     try {
       const pin = localStorage.getItem(PIN_KEY) || "";
       const res = await fetch(
-        `/api/matches/${matchId}/settlement?adminPin=${encodeURIComponent(pin)}`
+        `/api/matches/${matchId}/custom-attendees?adminPin=${encodeURIComponent(
+          pin
+        )}`
       );
-      if (res.ok) {
-        const s = await res.json();
-        if (s.settlements) {
-          const tx = s.settlements.map(
+      if (!res.ok) return;
+      const d = await res.json();
+      if (Array.isArray(d.items)) {
+        setCustomParticipants(
+          d.items.map(
             (x: {
-              playerId?: string | null;
-              customId?: string | null;
-              player?: { name: string } | null;
-              custom?: { name: string } | null;
-              amount: number;
-              paid: boolean;
+              id: string;
+              name: string;
+              guestCount: number;
+              playerId?: string;
             }) => ({
-              playerId: x.playerId ?? x.customId ?? "",
-              playerName: x.player?.name ?? x.custom?.name ?? "",
-              amount: x.amount,
-              balanceBefore: 0,
-              balanceAfter: 0,
-              paid: x.paid,
-              isCustom: !!x.customId,
+              id: x.id,
+              name: x.name,
+              guestCount: x.guestCount || 0,
+              isExistingPlayer: !!x.playerId,
+              playerId: x.playerId || undefined,
             })
-          );
-          const totalAmount = tx.reduce(
-            (sum: number, t: { amount: number }) => sum + t.amount,
-            0
-          );
-          const paidAmount = tx.reduce(
-            (sum: number, t: { amount: number; paid: boolean }) =>
-              sum + (t.paid ? t.amount : 0),
-            0
-          );
-          setSummary({
-            totalAttended,
-            fieldCost,
-            perPersonCost,
-            remainder,
-            totalAmount,
-            paidAmount,
-            transactions: tx,
-          });
-          return;
-        }
+          )
+        );
       }
     } catch {}
-
-    // Fallback to local computation if backend fetch fails immediately
-    {
-      const totalAmount = transactions.reduce((sum, t) => sum + t.amount, 0);
-      const paidAmount = transactions.reduce(
-        (sum, t) => sum + (t.paid ? t.amount : 0),
-        0
-      );
-
-      setSummary({
-        totalAttended,
-        fieldCost,
-        perPersonCost,
-        remainder,
-        totalAmount,
-        paidAmount,
-        transactions,
-      });
-    }
   }
 
   const togglePaymentStatus = async (playerId: string) => {
@@ -741,6 +755,16 @@ export default function SettlementPage() {
     );
 
     if (existingPlayer) {
+      const inAttendanceList = attendance.find(
+        (a) => a.playerId === existingPlayer.value
+      );
+      if (inAttendanceList) {
+        setMsg(
+          `${existingPlayer.label} đã có trong danh sách điểm danh. Hãy đánh dấu "Có mặt" ở danh sách phía trên thay vì thêm lại.`
+        );
+        return;
+      }
+
       // Add existing player
       const isAlreadyAdded = customParticipants.some(
         (p) => p.playerId === existingPlayer.value

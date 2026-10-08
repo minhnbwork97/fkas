@@ -1,6 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/src/lib/prisma";
 import { assertAdmin } from "@/src/lib/adminGuard";
+import { executeTransaction } from "@/src/lib/transaction";
+import {
+  findDuplicatePayers,
+  planSettlement,
+  type SettlementMember,
+  type SettlementParticipant,
+} from "@/src/lib/settlement";
 
 export async function GET(
   req: NextRequest,
@@ -43,6 +50,20 @@ export async function GET(
   }
 }
 
+type IncomingMember = {
+  playerId: string;
+  memberAttended: boolean;
+  guestsAttended: number;
+};
+
+type IncomingParticipant = {
+  tempId: string;
+  name: string;
+  guestCount: number;
+  isExistingPlayer?: boolean;
+  playerId?: string;
+};
+
 export async function POST(
   req: NextRequest,
   context: { params: Promise<{ matchId: string }> }
@@ -50,14 +71,8 @@ export async function POST(
   try {
     const { matchId } = await context.params;
     const body = await req.json();
-    const {
-      adminPin,
-      actualAttendees,
-      fieldCost,
-      attendanceData,
-      customParticipants,
-      totalAttended: totalAttendedFromClient,
-    } = body;
+    // totalAttended from the client is ignored: the split is computed here.
+    const { adminPin, fieldCost, attendanceData, customParticipants } = body;
 
     if (!adminPin) {
       return NextResponse.json(
@@ -73,432 +88,223 @@ export async function POST(
       return NextResponse.json({ error: "Invalid admin PIN" }, { status: 403 });
     }
 
-    if (!actualAttendees || !Array.isArray(actualAttendees)) {
+    if (!Array.isArray(attendanceData)) {
       return NextResponse.json(
-        { error: "actualAttendees array required" },
+        { error: "attendanceData array required" },
         { status: 400 }
       );
     }
 
-    // Get match
-    const match = await prisma.match.findUnique({
-      where: { id: matchId },
-    });
-
+    const match = await prisma.match.findUnique({ where: { id: matchId } });
     if (!match) {
       return NextResponse.json({ error: "Không tìm thấy" }, { status: 404 });
     }
-
-    // Load previous actual attendance BEFORE upserting to detect changes
-    const previousAttendance = await prisma.attendanceActual.findMany({
-      where: { matchId },
-      select: { playerId: true, memberAttended: true, guestsAttended: true },
-    });
-
-    // Save actual attendance data
-    if (attendanceData && Array.isArray(attendanceData)) {
-      for (const attendance of attendanceData) {
-        await prisma.attendanceActual.upsert({
-          where: {
-            matchId_playerId: {
-              matchId: matchId,
-              playerId: attendance.playerId,
-            },
-          },
-          update: {
-            memberAttended: attendance.memberAttended,
-            guestsAttended: attendance.guestsAttended,
-          },
-          create: {
-            matchId: matchId,
-            playerId: attendance.playerId,
-            memberAttended: attendance.memberAttended,
-            guestsAttended: attendance.guestsAttended,
-          },
-        });
-      }
+    if (match.status === "Settled") {
+      return NextResponse.json(
+        { error: "Trận đấu đã được xác nhận thanh toán, không thể tính lại" },
+        { status: 400 }
+      );
     }
 
-    // Process custom participants - separate existing players from true custom attendees
-    const existingPlayerParticipants: Array<{
-      playerId: string;
-      name: string;
-      guestCount: number;
-    }> = [];
-    const customRecords: Array<{
-      id: string;
-      name: string;
-      guestCount: number;
-    }> = [];
+    const cost =
+      typeof fieldCost === "number" && fieldCost > 0
+        ? fieldCost
+        : match.fieldCost;
 
-    if (Array.isArray(customParticipants) && customParticipants.length > 0) {
-      for (const cp of customParticipants as Array<{
-        tempId: string;
-        name: string;
-        guestCount: number;
-        isExistingPlayer?: boolean;
-        playerId?: string;
-      }>) {
-        if (cp.isExistingPlayer && cp.playerId) {
-          // This is an existing player added to custom list
-          existingPlayerParticipants.push({
-            playerId: cp.playerId,
-            name: cp.name,
-            guestCount: cp.guestCount || 0,
-          });
+    const members: SettlementMember[] = (
+      attendanceData as IncomingMember[]
+    ).map((a) => ({
+      playerId: a.playerId,
+      memberAttended: !!a.memberAttended,
+      guestsAttended: Math.max(0, Math.floor(a.guestsAttended || 0)),
+    }));
+    const incoming: IncomingParticipant[] = Array.isArray(customParticipants)
+      ? customParticipants
+      : [];
 
-          // Also save to CustomAttendee table for persistence
-          let rec = await prisma.customAttendee.findFirst({
-            where: { matchId, name: cp.name, playerId: cp.playerId },
-          });
-          if (!rec) {
-            rec = await prisma.customAttendee.create({
-              data: {
-                matchId,
-                name: cp.name,
-                guestCount: cp.guestCount || 0,
-                playerId: cp.playerId, // Store the playerId for existing players
-              },
-            });
-          } else if ((rec.guestCount || 0) !== (cp.guestCount || 0)) {
-            rec = await prisma.customAttendee.update({
-              where: { id: rec.id },
-              data: { guestCount: cp.guestCount || 0 },
-            });
-          }
-        } else {
-          // This is a true custom attendee
-          let rec = await prisma.customAttendee.findFirst({
-            where: { matchId, name: cp.name },
-          });
-          if (!rec) {
-            rec = await prisma.customAttendee.create({
-              data: { matchId, name: cp.name, guestCount: cp.guestCount || 0 },
-            });
-          } else if ((rec.guestCount || 0) !== (cp.guestCount || 0)) {
-            rec = await prisma.customAttendee.update({
-              where: { id: rec.id },
-              data: { guestCount: cp.guestCount || 0 },
-            });
-          }
-          customRecords.push({
-            id: rec.id,
-            name: rec.name,
-            guestCount: rec.guestCount,
-          });
-        }
-      }
-    }
-
-    // Get player details for actual attendees (members only) + existing player participants
-    const allPlayerIds = [
-      ...actualAttendees,
-      ...existingPlayerParticipants.map((p) => p.playerId),
+    // Every referenced player must exist
+    const referencedPlayerIds = [
+      ...new Set([
+        ...members.map((m) => m.playerId),
+        ...incoming
+          .filter((p) => p.isExistingPlayer && p.playerId)
+          .map((p) => p.playerId as string),
+      ]),
     ];
-    const attendees = await prisma.player.findMany({
-      where: { id: { in: allPlayerIds } },
+    const players = await prisma.player.findMany({
+      where: { id: { in: referencedPlayerIds } },
+      select: { id: true, name: true },
     });
-
-    if (attendees.length !== allPlayerIds.length) {
+    if (players.length !== referencedPlayerIds.length) {
       return NextResponse.json(
         { error: "Một số cầu thủ không tồn tại" },
         { status: 400 }
       );
     }
+    const playerName = new Map(players.map((p) => [p.id, p.name]));
 
-    // Detect if actual attendance changed vs previous
-    let attendanceChanged = true;
-    if (attendanceData && Array.isArray(attendanceData)) {
-      const prevMap = new Map(previousAttendance.map((a) => [a.playerId, a]));
-      const newMap = new Map(
-        (
-          attendanceData as Array<{
-            playerId: string;
-            memberAttended: boolean;
-            guestsAttended: number;
-          }>
-        ).map((a) => [a.playerId, a])
-      );
-      if (prevMap.size === newMap.size) {
-        attendanceChanged = false;
-        for (const [playerId, prev] of prevMap) {
-          const curr = newMap.get(playerId);
-          if (
-            !curr ||
-            curr.memberAttended !== prev.memberAttended ||
-            curr.guestsAttended !== prev.guestsAttended
-          ) {
-            attendanceChanged = true;
-            break;
-          }
-        }
-      }
-    }
-
-    // Build guest map for attendees (from latest attendanceData)
-    const guestsByPlayer = new Map<string, number>();
-    if (attendanceData && Array.isArray(attendanceData)) {
-      for (const a of attendanceData as Array<{
-        playerId: string;
-        memberAttended: boolean;
-        guestsAttended: number;
-      }>) {
-        if (a.memberAttended) {
-          guestsByPlayer.set(a.playerId, Math.max(0, a.guestsAttended || 0));
-        }
-      }
-    }
-
-    // Add guest counts for existing player participants
-    for (const participant of existingPlayerParticipants) {
-      guestsByPlayer.set(
-        participant.playerId,
-        Math.max(0, participant.guestCount || 0)
-      );
-    }
-
-    // Calculate counts for summary (prefer client total which includes guests/custom)
-    const customGuests = (customRecords || []).reduce(
-      (sum: number, p: { guestCount: number }) => sum + (p.guestCount || 0),
-      0
+    // A player can't be both an attending member and an extra participant
+    const duplicates = findDuplicatePayers(
+      members,
+      incoming
+        .filter((p) => p.isExistingPlayer && p.playerId)
+        .map((p) => ({
+          id: p.playerId as string,
+          kind: "player" as const,
+          guestCount: p.guestCount,
+        }))
     );
-    const existingPlayerGuests = existingPlayerParticipants.reduce(
-      (sum: number, p: { guestCount: number }) => sum + (p.guestCount || 0),
-      0
-    );
-    const computedWithGuests =
-      attendees.length +
-      Array.from(guestsByPlayer.values()).reduce((s, n) => s + n, 0) +
-      customGuests +
-      existingPlayerGuests;
-    const totalAttended = Math.max(
-      totalAttendedFromClient ?? computedWithGuests,
-      1
-    );
-    const perPersonCost = Math.floor(fieldCost / totalAttended);
-    const remainder = fieldCost - perPersonCost * totalAttended;
-
-    let settlements: Array<{
-      playerId: string;
-      playerName: string;
-      amount: number;
-      paid: boolean;
-    }>;
-    if (attendanceChanged) {
-      // Remove all and recreate
-      await prisma.settlement.deleteMany({ where: { matchId } });
-
-      settlements = [];
-      for (const player of attendees) {
-        const guestCount = guestsByPlayer.get(player.id) ?? 0;
-        const settlement = await prisma.settlement.create({
-          data: {
-            matchId: matchId,
-            playerId: player.id,
-            amount: perPersonCost * (1 + guestCount),
-            paid: false,
-          },
-        });
-
-        settlements.push({
-          playerId: player.id,
-          playerName: player.name,
-          amount: perPersonCost * (1 + guestCount),
-          paid: settlement.paid,
-        });
-      }
-
-      // Create settlements for existing player participants
-      for (const participant of existingPlayerParticipants) {
-        const guestCount = guestsByPlayer.get(participant.playerId) ?? 0;
-
-        // Check if settlement already exists for this player
-        const existingSettlement = await prisma.settlement.findFirst({
-          where: {
-            matchId: matchId,
-            playerId: participant.playerId,
-          },
-        });
-
-        let settlement;
-        if (existingSettlement) {
-          // Update existing settlement
-          settlement = await prisma.settlement.update({
-            where: { id: existingSettlement.id },
-            data: {
-              amount: perPersonCost * (1 + guestCount),
-            },
-          });
-        } else {
-          // Create new settlement
-          settlement = await prisma.settlement.create({
-            data: {
-              matchId: matchId,
-              playerId: participant.playerId,
-              amount: perPersonCost * (1 + guestCount),
-              paid: false,
-            },
-          });
-        }
-
-        settlements.push({
-          playerId: participant.playerId,
-          playerName: participant.name,
-          amount: perPersonCost * (1 + guestCount),
-          paid: settlement.paid,
-        });
-      }
-
-      // Create settlements for custom attendees
-      for (const ca of customRecords) {
-        const settlement = await prisma.settlement.create({
-          data: {
-            matchId,
-            customId: ca.id,
-            amount: perPersonCost * (1 + (ca.guestCount || 0)),
-            paid: false,
-          },
-        });
-        settlements.push({
-          playerId: ca.id,
-          playerName: ca.name,
-          amount: perPersonCost * (1 + (ca.guestCount || 0)),
-          paid: settlement.paid,
-        });
-      }
-    } else {
-      // Keep existing settlements if no attendance change, unless we must rebuild
-      const existing = await prisma.settlement.findMany({
-        where: { matchId },
-        include: {
-          player: { select: { name: true } },
-          custom: { select: { name: true } },
+    if (duplicates.length > 0) {
+      const names = duplicates.map((id) => playerName.get(id) ?? id).join(", ");
+      return NextResponse.json(
+        {
+          error: `${names} đã có trong danh sách điểm danh. Hãy đánh dấu có mặt ở danh sách thay vì thêm lại.`,
         },
-        orderBy: { createdAt: "asc" },
+        { status: 400 }
+      );
+    }
+
+    const result = await executeTransaction(async (tx) => {
+      // 1. Save actual attendance
+      for (const m of members) {
+        await tx.attendanceActual.upsert({
+          where: { matchId_playerId: { matchId, playerId: m.playerId } },
+          update: {
+            memberAttended: m.memberAttended,
+            guestsAttended: m.guestsAttended,
+          },
+          create: {
+            matchId,
+            playerId: m.playerId,
+            memberAttended: m.memberAttended,
+            guestsAttended: m.guestsAttended,
+          },
+        });
+      }
+
+      // 2. Sync extra participants with the submitted list
+      const existingCustom = await tx.customAttendee.findMany({
+        where: { matchId },
       });
+      const keptCustomIds = new Set<string>();
+      const participants: SettlementParticipant[] = [];
+      const customName = new Map<string, string>();
 
-      // Detect per-person change via GCD
-      const gcd = (a: number, b: number): number =>
-        b === 0 ? a : gcd(b, a % b);
-      let base = 0;
-      for (const s of existing)
-        base = base === 0 ? s.amount : gcd(base, s.amount);
-      const perChanged = base > 0 && base !== perPersonCost;
+      for (const p of incoming) {
+        const guestCount = Math.max(0, Math.floor(p.guestCount || 0));
+        const linkedPlayerId = p.isExistingPlayer ? p.playerId : undefined;
+        const rec =
+          existingCustom.find((c) => c.id === p.tempId) ??
+          existingCustom.find((c) =>
+            linkedPlayerId
+              ? c.playerId === linkedPlayerId
+              : !c.playerId && c.name === p.name && !keptCustomIds.has(c.id)
+          );
 
-      // Rebuild if no settlements yet, or per-person changed, or custom count changed
-      const existingCustomCount = existing.filter(
-        (e) => e.customId != null
-      ).length;
-      const needRebuild =
-        existing.length === 0 ||
-        perChanged ||
-        existingCustomCount !== customRecords.length;
-
-      if (needRebuild) {
-        await prisma.settlement.deleteMany({ where: { matchId } });
-
-        settlements = [];
-        for (const player of attendees) {
-          const guestCount = guestsByPlayer.get(player.id) ?? 0;
-          const settlement = await prisma.settlement.create({
-            data: {
-              matchId: matchId,
-              playerId: player.id,
-              amount: perPersonCost * (1 + guestCount),
-              paid: false,
-            },
-          });
-          settlements.push({
-            playerId: player.id,
-            playerName: player.name,
-            amount: perPersonCost * (1 + guestCount),
-            paid: settlement.paid,
-          });
-        }
-
-        // Create settlements for existing player participants
-        for (const participant of existingPlayerParticipants) {
-          const guestCount = guestsByPlayer.get(participant.playerId) ?? 0;
-
-          // Check if settlement already exists for this player
-          const existingSettlement = await prisma.settlement.findFirst({
-            where: {
-              matchId: matchId,
-              playerId: participant.playerId,
-            },
-          });
-
-          let settlement;
-          if (existingSettlement) {
-            // Update existing settlement
-            settlement = await prisma.settlement.update({
-              where: { id: existingSettlement.id },
-              data: {
-                amount: perPersonCost * (1 + guestCount),
-              },
-            });
-          } else {
-            // Create new settlement
-            settlement = await prisma.settlement.create({
-              data: {
-                matchId: matchId,
-                playerId: participant.playerId,
-                amount: perPersonCost * (1 + guestCount),
-                paid: false,
-              },
+        let id: string;
+        if (rec) {
+          id = rec.id;
+          if (rec.guestCount !== guestCount) {
+            await tx.customAttendee.update({
+              where: { id },
+              data: { guestCount },
             });
           }
-
-          settlements.push({
-            playerId: participant.playerId,
-            playerName: participant.name,
-            amount: perPersonCost * (1 + guestCount),
-            paid: settlement.paid,
-          });
-        }
-
-        for (const ca of customRecords) {
-          const settlement = await prisma.settlement.create({
+        } else {
+          const created = await tx.customAttendee.create({
             data: {
               matchId,
-              customId: ca.id,
-              amount: perPersonCost * (1 + (ca.guestCount || 0)),
-              paid: false,
+              name: p.name,
+              guestCount,
+              playerId: linkedPlayerId ?? null,
             },
           });
-          settlements.push({
-            playerId: ca.id,
-            playerName: ca.name,
-            amount: perPersonCost * (1 + (ca.guestCount || 0)),
-            paid: settlement.paid,
+          id = created.id;
+        }
+        keptCustomIds.add(id);
+
+        if (linkedPlayerId) {
+          participants.push({ id: linkedPlayerId, kind: "player", guestCount });
+        } else {
+          participants.push({ id, kind: "custom", guestCount });
+          customName.set(id, p.name);
+        }
+      }
+
+      // 3. Rebuild settlements, keeping each payer's paid status
+      const plan = planSettlement(cost, members, participants);
+
+      const previous = await tx.settlement.findMany({ where: { matchId } });
+      const keyOf = (kind: string, id: string) => `${kind}:${id}`;
+      const previousByKey = new Map(
+        previous.map((s) => [
+          s.playerId ? keyOf("player", s.playerId) : keyOf("custom", s.customId!),
+          s,
+        ])
+      );
+
+      await tx.settlement.deleteMany({ where: { matchId } });
+      // Participants removed from the list must not come back on reload
+      await tx.customAttendee.deleteMany({
+        where: { matchId, id: { notIn: [...keptCustomIds] } },
+      });
+
+      const paidAmountChanged: Array<{
+        name: string;
+        paidAmount: number;
+        newAmount: number;
+      }> = [];
+      const lines = plan.lines.map((line) => {
+        const prev = previousByKey.get(keyOf(line.kind, line.id));
+        const paid = prev?.paid ?? false;
+        const name =
+          line.kind === "player"
+            ? playerName.get(line.id) ?? ""
+            : customName.get(line.id) ?? "";
+        if (paid && prev && prev.amount !== line.amount) {
+          paidAmountChanged.push({
+            name,
+            paidAmount: prev.amount,
+            newAmount: line.amount,
           });
         }
-      } else {
-        settlements = existing.map((s) => ({
-          playerId: (s.playerId ?? s.customId)!,
-          playerName: s.player?.name ?? s.custom?.name ?? "",
-          amount: s.amount,
-          paid: s.paid,
-        }));
-      }
-    }
+        return { ...line, paid, name };
+      });
 
-    // Note: remainder is tracked but not recorded as a transaction
-    // since all fund tracking is now per-player via Transaction model
+      if (lines.length > 0) {
+        await tx.settlement.createMany({
+          data: lines.map((l) => ({
+            matchId,
+            playerId: l.kind === "player" ? l.id : null,
+            customId: l.kind === "custom" ? l.id : null,
+            amount: l.amount,
+            paid: l.paid,
+          })),
+        });
+      }
+
+      return { plan, lines, paidAmountChanged };
+    });
 
     // Note: Match status is NOT automatically set to "Settled" here
     // The organizer must explicitly confirm settlement via separate API call
-
     return NextResponse.json(
       {
         success: true,
         summary: {
-          totalAttended,
-          fieldCost,
-          perPersonCost,
-          remainder,
-          transactions: settlements,
+          totalAttended: result.plan.totalAttended,
+          fieldCost: cost,
+          perPersonCost: result.plan.perPersonCost,
+          remainder: result.plan.remainder,
+          transactions: result.lines.map((l) => ({
+            playerId: l.id,
+            playerName: l.name,
+            amount: l.amount,
+            paid: l.paid,
+            isCustom: l.kind === "custom",
+          })),
         },
+        paidAmountChanged: result.paidAmountChanged,
       },
       { status: 200 }
     );
