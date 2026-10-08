@@ -39,21 +39,62 @@ export async function POST(req: NextRequest) {
   }
 }
 
-export async function GET() {
+const MATCH_LIST_SELECT = {
+  id: true,
+  dateTime: true,
+  type: true,
+  fieldCost: true,
+  status: true,
+  link: true,
+} as const;
+
+const DEFAULT_PAGE_SIZE = 10;
+const MAX_PAGE_SIZE = 50;
+
+export async function GET(req: NextRequest) {
   try {
-    const matches = await prisma.match.findMany({
-      orderBy: { dateTime: "desc" },
-      take: 50,
-      select: {
-        id: true,
-        dateTime: true,
-        type: true,
-        fieldCost: true,
-        status: true,
-        link: true,
+    const params = req.nextUrl.searchParams;
+
+    // Without ?page the response keeps its original shape (latest 50),
+    // which the receivables filter relies on.
+    if (!params.has("page")) {
+      const matches = await prisma.match.findMany({
+        orderBy: { dateTime: "desc" },
+        take: 50,
+        select: MATCH_LIST_SELECT,
+      });
+      return NextResponse.json({ matches }, { status: 200 });
+    }
+
+    const page = Math.max(1, parseInt(params.get("page") ?? "1", 10) || 1);
+    const pageSize = Math.min(
+      MAX_PAGE_SIZE,
+      Math.max(
+        1,
+        parseInt(params.get("pageSize") ?? "", 10) || DEFAULT_PAGE_SIZE
+      )
+    );
+
+    const [matches, total] = await Promise.all([
+      prisma.match.findMany({
+        orderBy: { dateTime: "desc" },
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+        select: MATCH_LIST_SELECT,
+      }),
+      prisma.match.count(),
+    ]);
+
+    return NextResponse.json(
+      {
+        matches,
+        page,
+        pageSize,
+        total,
+        totalPages: Math.max(1, Math.ceil(total / pageSize)),
       },
-    });
-    return NextResponse.json({ matches }, { status: 200 });
+      { status: 200 }
+    );
   } catch (e: unknown) {
     return NextResponse.json(
       { error: e instanceof Error ? e.message : "Lỗi hệ thống" },

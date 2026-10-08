@@ -6,8 +6,11 @@ import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { MatchStatus } from "@prisma/client";
 import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 
 const PIN_KEY = "fkas_admin_pin";
+const PAGE_SIZE = 10;
 
 type MatchListItem = {
   id: string;
@@ -21,6 +24,11 @@ type MatchListItem = {
 export default function OrganizerMatchesPage() {
   const router = useRouter();
   const [items, setItems] = useState<MatchListItem[]>([]);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [total, setTotal] = useState(0);
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
 
   useEffect(() => {
     const pin = localStorage.getItem(PIN_KEY);
@@ -28,11 +36,44 @@ export default function OrganizerMatchesPage() {
       router.replace("/organizer/login");
       return;
     }
-    fetch("/api/matches")
-      .then((r) => r.json())
-      .then((d) => setItems(d.matches ?? []))
-      .catch(() => setItems([]));
-  }, [router]);
+
+    let cancelled = false;
+    setIsLoading(true);
+    setLoadError("");
+    fetch(`/api/matches?page=${page}&pageSize=${PAGE_SIZE}`)
+      .then(async (r) => {
+        const d = await r.json();
+        if (!r.ok) throw new Error(d.error || `Lỗi ${r.status}`);
+        return d;
+      })
+      .then((d) => {
+        if (cancelled) return;
+        setItems(d.matches ?? []);
+        setTotal(d.total ?? 0);
+        setTotalPages(d.totalPages ?? 1);
+        // A deleted match can leave us past the last page
+        if (d.totalPages && page > d.totalPages) setPage(d.totalPages);
+      })
+      .catch((e: unknown) => {
+        if (cancelled) return;
+        setItems([]);
+        setLoadError(
+          e instanceof Error ? e.message : "Không tải được danh sách trận đấu"
+        );
+      })
+      .finally(() => {
+        if (!cancelled) setIsLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [router, page]);
+
+  const goToPage = (next: number) => {
+    setPage(Math.min(Math.max(1, next), totalPages));
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
 
   return (
     <main className="max-w-2xl mx-auto p-6 space-y-4">
@@ -43,7 +84,26 @@ export default function OrganizerMatchesPage() {
         </Button>
       </div>
       <div className="grid gap-3">
-        {items.map((m) => (
+        {isLoading &&
+          Array.from({ length: 3 }).map((_, i) => (
+            <Card key={i}>
+              <CardHeader>
+                <Skeleton className="h-5 w-48" />
+              </CardHeader>
+              <CardContent>
+                <Skeleton className="h-4 w-32" />
+              </CardContent>
+            </Card>
+          ))}
+        {!isLoading && loadError && (
+          <p className="text-sm text-red-600">{loadError}</p>
+        )}
+        {!isLoading && !loadError && items.length === 0 && (
+          <p className="text-sm text-gray-600">
+            Chưa có trận đấu nào. Bấm Tạo Trận Đấu để bắt đầu.
+          </p>
+        )}
+        {!isLoading && items.map((m) => (
           <Link href={`/organizer/matches/${m.id}`} key={m.id}>
             <Card>
               <CardHeader>
@@ -70,6 +130,38 @@ export default function OrganizerMatchesPage() {
           </Link>
         ))}
       </div>
+
+      {totalPages > 1 && (
+        <nav
+          aria-label="Phân trang danh sách trận đấu"
+          className="flex items-center justify-between gap-3 pt-2"
+        >
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => goToPage(page - 1)}
+            disabled={page <= 1 || isLoading}
+          >
+            <ChevronLeft />
+            Trước
+          </Button>
+          <div className="text-center">
+            <p className="scoreboard text-lg text-gray-900">
+              Trang {page} / {totalPages}
+            </p>
+            <p className="text-xs text-gray-500">{total} trận đấu</p>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => goToPage(page + 1)}
+            disabled={page >= totalPages || isLoading}
+          >
+            Sau
+            <ChevronRight />
+          </Button>
+        </nav>
+      )}
     </main>
   );
 }
