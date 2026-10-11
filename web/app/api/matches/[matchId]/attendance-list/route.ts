@@ -67,8 +67,13 @@ export async function GET(
       ); // 9 hours before match
       const isLateSubmission = intent.createdAt > officialDeadline;
 
-      // Get actual attendance data if available
-      const actual = actualAttendanceMap.get(intent.playerId);
+      // The organizer's saved actual attendance wins, unless the player changed
+      // their registration after it was saved (intent.createdAt is bumped on
+      // every update). Then the new registration is used and flagged.
+      const savedActual = actualAttendanceMap.get(intent.playerId);
+      const changedSinceSettlement =
+        !!savedActual && intent.createdAt > savedActual.updatedAt;
+      const actual = changedSinceSettlement ? undefined : savedActual;
 
       return {
         playerId: intent.playerId,
@@ -84,6 +89,7 @@ export async function GET(
         guestsAttended:
           actual?.guestsAttended ??
           (intent.status === "Attending" ? intent.guestCount : 0),
+        changedSinceSettlement,
       };
     });
 

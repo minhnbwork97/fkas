@@ -22,6 +22,7 @@ type AttendanceActual = {
   note: string;
   memberAttended: boolean; // Whether the member themselves attended
   guestsAttended: number; // How many guests actually attended
+  changedSinceSettlement?: boolean; // Player re-registered after last calculation
 };
 
 type SettlementSummary = {
@@ -931,12 +932,21 @@ export default function SettlementPage() {
                 className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-3 border rounded-lg gap-2"
               >
                 <div className="flex-1">
-                  <div className="flex items-center gap-2 mb-2">
+                  <div className="flex flex-wrap items-center gap-2 mb-2">
                     <span className="font-medium">{item.playerName}</span>
                     <Badge variant={item.status === "Attending" ? "default" : "secondary"}>
                       {item.status === "Attending" ? "Đã Xác Nhận" : "Không Xác Nhận"}
                     </Badge>
                     {item.isLate && <Badge variant="outline">Muộn</Badge>}
+                    {item.changedSinceSettlement && (
+                      <Badge
+                        variant="outline"
+                        className="border-amber-300 bg-amber-50 text-amber-800"
+                        title="Cầu thủ đã sửa điểm danh sau lần tính trước, đang dùng điểm danh mới nhất"
+                      >
+                        Đã đổi điểm danh sau lần tính trước
+                      </Badge>
+                    )}
                   </div>
 
                   {/* Member Attendance Control - 2-State Button */}

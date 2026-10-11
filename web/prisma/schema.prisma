@@ -78,6 +78,8 @@ model AttendanceActual {
   memberAttended Boolean  @default(false)
   guestsAttended Int      @default(0)
   createdAt      DateTime @default(now())
+  /// Last time an organizer saved this row from the settlement page
+  updatedAt      DateTime @default(now()) @updatedAt
   match          Match    @relation(fields: [matchId], references: [id])
   player         Player   @relation(fields: [playerId], references: [id])
 
