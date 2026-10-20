@@ -214,3 +214,15 @@ export function displayName(item: {
 }): string {
   return item.player?.name ?? item.guestName ?? "?";
 }
+
+/** Image metadata only: never select `data` when listing */
+export const kitImageSelect = {
+  id: true,
+  kind: true,
+} as const;
+
+export const MAX_KIT_IMAGE_BYTES = 3 * 1024 * 1024;
+export const MAX_KIT_PREVIEW_IMAGES = 10;
+
+export const kitImageUrl = (kitOrderId: string, imageId: string) =>
+  `/api/kit-orders/${kitOrderId}/images/${imageId}`;

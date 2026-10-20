@@ -12,7 +12,8 @@ import {
   itemToFormValues,
   toKitItemPayload,
 } from "@/components/KitItemForm";
-import { sizeText } from "@/src/lib/kit-order";
+import { kitImageUrl, sizeText } from "@/src/lib/kit-order";
+import { KitGallery, type KitImage } from "@/components/KitImages";
 import { getDeviceId } from "@/src/lib/deviceFingerprint";
 
 const vnd = (n: number) => `${n.toLocaleString("vi-VN")}đ`;
@@ -39,6 +40,7 @@ type PublicData = {
     deadline: string | null;
     registrationOpen: boolean;
   };
+  images: KitImage[];
   takenNumbers: { number: number | null; printName: string | null }[];
   player: { id: string; name: string } | null;
   myItem: MyItem | null;
@@ -142,12 +144,14 @@ export default function KitRegistrationPage() {
 
   const { order, player, myItem } = data;
   const canEdit = order.registrationOpen && myItem !== null && !myItem.paid;
+  const sizeChart = data.images.find((i) => i.kind === "SizeChart");
 
   const form = (
     <KitItemForm
       initial={myItem ? itemToFormValues(myItem) : undefined}
       defaultPrice={order.defaultPrice}
       printOnlyPrice={order.printOnlyPrice}
+      sizeChartUrl={sizeChart ? kitImageUrl(order.id, sizeChart.id) : null}
       takenNumbers={data.takenNumbers}
       submitLabel={myItem ? "Lưu" : "Đăng ký"}
       onCancel={myItem ? () => setIsEditing(false) : undefined}
@@ -176,6 +180,8 @@ export default function KitRegistrationPage() {
           </p>
         )}
       </header>
+
+      <KitGallery kitOrderId={order.id} images={data.images} />
 
       <section className="rounded-2xl border bg-white p-5 space-y-5">
         {order.description && (

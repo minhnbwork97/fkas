@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { KIT_SIZES, KIT_SIZE_LABEL } from "@/src/lib/kit-order";
+import { ImageLightbox } from "@/components/KitImages";
 
 export type KitItemFormValues = {
   size: KitSize | null;
@@ -86,6 +87,7 @@ export function KitItemForm({
   initial = emptyKitItem,
   defaultPrice,
   printOnlyPrice,
+  sizeChartUrl = null,
   takenNumbers = [],
   submitLabel,
   onSubmit,
@@ -97,6 +99,8 @@ export function KitItemForm({
   defaultPrice: number;
   /** null hides the print-only option */
   printOnlyPrice: number | null;
+  /** Shows a "how to pick a size" link when set */
+  sizeChartUrl?: string | null;
   /** Numbers already used by others, for a duplicate warning */
   takenNumbers?: { number: number | null; printName: string | null }[];
   submitLabel: string;
@@ -110,6 +114,7 @@ export function KitItemForm({
 }) {
   const [v, setV] = useState<KitItemFormValues>(initial);
   const [isSaving, setIsSaving] = useState(false);
+  const [showSizeChart, setShowSizeChart] = useState(false);
   const set = <K extends keyof KitItemFormValues>(
     key: K,
     value: KitItemFormValues[K]
@@ -148,7 +153,18 @@ export function KitItemForm({
 
       {!v.printOnly && (
         <div className="space-y-1.5">
-          <Label>Size</Label>
+          <div className="flex items-center justify-between">
+            <Label>Size</Label>
+            {sizeChartUrl && (
+              <button
+                type="button"
+                className="text-xs font-medium text-pitch hover:underline"
+                onClick={() => setShowSizeChart(true)}
+              >
+                Hướng dẫn chọn size
+              </button>
+            )}
+          </div>
           <Choice
             options={KIT_SIZES.map((s) => ({
               value: s,
@@ -209,6 +225,13 @@ export function KitItemForm({
         )}
         {footer}
       </div>
+      {showSizeChart && sizeChartUrl && (
+        <ImageLightbox
+          srcs={[sizeChartUrl]}
+          alt="Bảng size"
+          onClose={() => setShowSizeChart(false)}
+        />
+      )}
     </form>
   );
 }

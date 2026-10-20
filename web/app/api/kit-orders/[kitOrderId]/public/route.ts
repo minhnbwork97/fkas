@@ -3,6 +3,7 @@ import { prisma } from "@/src/lib/prisma";
 import {
   formatKitPaymentDescription,
   isRegistrationOpen,
+  kitImageSelect,
 } from "@/src/lib/kit-order";
 import { resolvePlayer } from "@/src/lib/player-identity";
 import { generatePaymentQR, getBankInfo } from "@/src/lib/qr-payment";
@@ -25,6 +26,10 @@ export async function GET(
           where: { number: { not: null } },
           select: { number: true, printName: true, playerId: true },
           orderBy: { number: "asc" },
+        },
+        images: {
+          select: kitImageSelect,
+          orderBy: [{ position: "asc" }, { createdAt: "asc" }],
         },
       },
     });
@@ -80,6 +85,7 @@ export async function GET(
         status: order.status,
         registrationOpen: isRegistrationOpen(order),
       },
+      images: order.images,
       // Numbers used by others, for the duplicate warning
       takenNumbers: order.items
         .filter((i) => !player || i.playerId !== player.id)

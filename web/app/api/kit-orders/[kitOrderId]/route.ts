@@ -5,6 +5,7 @@ import { adminPinError } from "@/src/lib/adminGuard";
 import {
   displayName,
   isBlank,
+  kitImageSelect,
   kitItemInclude,
   parseMoney,
   priceFor,
@@ -30,6 +31,10 @@ export async function GET(req: NextRequest, context: Ctx) {
       where: { id: kitOrderId },
       include: {
         items: { include: kitItemInclude, orderBy: { createdAt: "asc" } },
+        images: {
+          select: kitImageSelect,
+          orderBy: [{ position: "asc" }, { createdAt: "asc" }],
+        },
       },
     });
     if (!order) {

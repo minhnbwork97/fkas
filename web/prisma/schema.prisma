@@ -151,7 +151,7 @@ enum RosterRequestStatus {
 
 /// Một đợt làm áo đội. Tiền thu áo tách biệt hoàn toàn với quỹ (không tạo Transaction).
 model KitOrder {
-  id             String         @id @default(uuid())
+  id             String          @id @default(uuid())
   name           String
   description    String?
   /// Giá mặc định cho một áo (mua áo + in)
@@ -159,10 +159,32 @@ model KitOrder {
   /// Giá khi chỉ in (tự mang áo); null = không nhận chỉ in
   printOnlyPrice Int?
   deadline       DateTime?
-  status         KitOrderStatus @default(Collecting)
-  createdAt      DateTime       @default(now())
-  updatedAt      DateTime       @updatedAt
+  status         KitOrderStatus  @default(Collecting)
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
   items          KitOrderItem[]
+  images         KitOrderImage[]
+}
+
+/// Ảnh của đợt áo: nhiều ảnh minh hoạ, tối đa một bảng size.
+/// Lưu thẳng trong DB (đã thu nhỏ ở trình duyệt) để không cần dịch vụ lưu file.
+model KitOrderImage {
+  id         String       @id @default(uuid())
+  kitOrderId String
+  kind       KitImageKind
+  mimeType   String
+  data       Bytes
+  /// Thứ tự hiển thị ảnh minh hoạ, organizer kéo thả để đổi
+  position   Int          @default(0)
+  createdAt  DateTime     @default(now())
+  kitOrder   KitOrder     @relation(fields: [kitOrderId], references: [id], onDelete: Cascade)
+
+  @@index([kitOrderId])
+}
+
+enum KitImageKind {
+  Preview
+  SizeChart
 }
 
 enum KitOrderStatus {

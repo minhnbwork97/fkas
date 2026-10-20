@@ -25,9 +25,11 @@ import {
   itemToFormValues,
   toKitItemPayload,
 } from "@/components/KitItemForm";
+import { KitImageManager, type KitImage } from "@/components/KitImages";
 import {
   KIT_ORDER_STATUS_LABEL,
   KIT_SIZES,
+  kitImageUrl,
   sizeText,
   type KitOrderSummary,
 } from "@/src/lib/kit-order";
@@ -61,6 +63,7 @@ type KitOrderDetail = {
   status: KitOrderStatus;
   summary: KitOrderSummary;
   items: KitItem[];
+  images: KitImage[];
 };
 
 type Filter = "all" | "unpaid" | "paid";
@@ -404,6 +407,15 @@ export default function KitOrderDetailPage() {
           Bấm vào tên để sửa. Bấm trạng thái để đánh dấu đã thu.
         </p>
       </section>
+
+      <section className="rounded-xl border bg-white p-4">
+        <KitImageManager
+          kitOrderId={order.id}
+          images={order.images}
+          adminPin={pin()}
+          onChange={load}
+        />
+      </section>
     </main>
   );
 }
@@ -423,6 +435,11 @@ function downloadCsv(filename: string, rows: (string | number)[][]) {
   a.download = filename;
   a.click();
   URL.revokeObjectURL(url);
+}
+
+function sizeChartUrlOf(order: KitOrderDetail): string | null {
+  const chart = order.images.find((i) => i.kind === "SizeChart");
+  return chart ? kitImageUrl(order.id, chart.id) : null;
 }
 
 function sizeLine(s: KitOrderSummary): string {
@@ -513,6 +530,7 @@ function AddItemForm({
       <KitItemForm
         defaultPrice={order.defaultPrice}
         printOnlyPrice={order.printOnlyPrice}
+        sizeChartUrl={sizeChartUrlOf(order)}
         takenNumbers={order.items}
         submitLabel="Thêm"
         onCancel={onCancel}
@@ -572,6 +590,7 @@ function EditItemForm({
       initial={itemToFormValues(item)}
       defaultPrice={order.defaultPrice}
       printOnlyPrice={order.printOnlyPrice}
+      sizeChartUrl={sizeChartUrlOf(order)}
       takenNumbers={order.items.filter((i) => i.id !== item.id)}
       submitLabel="Lưu"
       onCancel={onCancel}
