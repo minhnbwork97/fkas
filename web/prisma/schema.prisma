@@ -19,6 +19,7 @@ model Player {
   txs             Transaction[]
   settlements     Settlement[]
   customAttendees CustomAttendee[]
+  kitItems        KitOrderItem[]
 }
 
 model Match {
@@ -146,4 +147,65 @@ enum RosterRequestStatus {
   Pending
   Approved
   Rejected
+}
+
+/// Một đợt làm áo đội. Tiền thu áo tách biệt hoàn toàn với quỹ (không tạo Transaction).
+model KitOrder {
+  id             String         @id @default(uuid())
+  name           String
+  description    String?
+  /// Giá mặc định cho một áo (mua áo + in)
+  defaultPrice   Int
+  /// Giá khi chỉ in (tự mang áo); null = không nhận chỉ in
+  printOnlyPrice Int?
+  deadline       DateTime?
+  status         KitOrderStatus @default(Collecting)
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  items          KitOrderItem[]
+}
+
+enum KitOrderStatus {
+  Collecting
+  Ordered
+  Delivered
+}
+
+/// Một áo trong đợt. Mỗi cầu thủ đăng ký tối đa một áo mỗi đợt.
+model KitOrderItem {
+  id              String    @id @default(uuid())
+  kitOrderId      String
+  /// Cầu thủ đăng ký; null nếu organizer thêm cho người ngoài
+  playerId        String?
+  guestName       String?
+  /// null khi chỉ in (tự mang áo)
+  size            KitSize?
+  /// Bắt buộc khi size = Other
+  sizeNote        String?
+  printName       String?
+  number          Int?
+  printOnly       Boolean   @default(false)
+  amount          Int
+  /// Organizer đã đặt giá riêng: đổi giá đợt sẽ không ghi đè dòng này
+  priceOverridden Boolean   @default(false)
+  paid            Boolean   @default(false)
+  paidAt          DateTime?
+  /// Cầu thủ bấm "Tôi đã chuyển khoản", chờ organizer xác nhận
+  selfReportedAt  DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  kitOrder        KitOrder  @relation(fields: [kitOrderId], references: [id], onDelete: Cascade)
+  player          Player?   @relation(fields: [playerId], references: [id])
+
+  @@unique([kitOrderId, playerId])
+  @@index([kitOrderId])
+}
+
+enum KitSize {
+  S
+  M
+  L
+  XL
+  XXL
+  Other
 }

@@ -8,6 +8,7 @@ import {
   DollarSign,
   FileText,
   Calendar,
+  Shirt,
 } from "lucide-react";
 import { usePathname } from "next/navigation";
 import { PitchMarkings } from "@/components/PitchMarkings";
@@ -89,6 +90,7 @@ export default function OrganizerLayoutClient({
     { href: "/organizer/players", label: "Cầu Thủ", icon: Users },
     { href: "/organizer/fund", label: "Quỹ Đội", icon: DollarSign },
     { href: "/organizer/receivables", label: "Công Nợ", icon: FileText },
+    { href: "/organizer/kits", label: "Áo Đội", icon: Shirt },
   ];
 
   const isActiveLink = (href: string) => {

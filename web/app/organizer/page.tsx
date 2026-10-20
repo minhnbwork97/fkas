@@ -7,6 +7,7 @@ import {
   DollarSign,
   FileText,
   Plus,
+  Shirt,
   Users,
 } from "lucide-react";
 
@@ -78,6 +79,17 @@ export default function OrganizerPage() {
               <FileText />
             </span>
             <span className={labelClass}>Quản Lý Công Nợ</span>
+            <ChevronRight className={chevronClass} />
+          </Button>
+          <Button
+            variant="outline"
+            className={tileClass}
+            onClick={() => router.push("/organizer/kits")}
+          >
+            <span className={iconClass}>
+              <Shirt />
+            </span>
+            <span className={labelClass}>Áo Đội</span>
             <ChevronRight className={chevronClass} />
           </Button>
         </div>
