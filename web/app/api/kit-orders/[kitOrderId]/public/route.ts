@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/src/lib/prisma";
 import {
   formatKitPaymentDescription,
+  displayName,
   isRegistrationOpen,
   kitImageSelect,
 } from "@/src/lib/kit-order";
@@ -22,10 +23,19 @@ export async function GET(
     const order = await prisma.kitOrder.findUnique({
       where: { id: kitOrderId },
       include: {
+        // Everyone's shirt for the public list: no money fields here
         items: {
-          where: { number: { not: null } },
-          select: { number: true, printName: true, playerId: true },
-          orderBy: { number: "asc" },
+          select: {
+            id: true,
+            playerId: true,
+            guestName: true,
+            player: { select: { name: true } },
+            size: true,
+            sizeNote: true,
+            printName: true,
+            number: true,
+          },
+          orderBy: { createdAt: "asc" },
         },
         images: {
           select: kitImageSelect,
@@ -86,10 +96,15 @@ export async function GET(
         registrationOpen: isRegistrationOpen(order),
       },
       images: order.images,
-      // Numbers used by others, for the duplicate warning
-      takenNumbers: order.items
-        .filter((i) => !player || i.playerId !== player.id)
-        .map(({ number, printName }) => ({ number, printName })),
+      registrations: order.items.map((i) => ({
+        id: i.id,
+        name: displayName(i),
+        size: i.size,
+        sizeNote: i.sizeNote,
+        printName: i.printName,
+        number: i.number,
+        mine: player !== null && i.playerId === player.id,
+      })),
       player,
       myItem,
       qrCodeUrl,

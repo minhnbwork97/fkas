@@ -41,10 +41,20 @@ type PublicData = {
     registrationOpen: boolean;
   };
   images: KitImage[];
-  takenNumbers: { number: number | null; printName: string | null }[];
+  registrations: Registration[];
   player: { id: string; name: string } | null;
   myItem: MyItem | null;
   qrCodeUrl: string | null;
+};
+
+type Registration = {
+  id: string;
+  name: string;
+  size: KitSize | null;
+  sizeNote: string | null;
+  printName: string | null;
+  number: number | null;
+  mine: boolean;
 };
 
 type Identity = { deviceId?: string; phone?: string };
@@ -152,7 +162,7 @@ export default function KitRegistrationPage() {
       defaultPrice={order.defaultPrice}
       printOnlyPrice={order.printOnlyPrice}
       sizeChartUrl={sizeChart ? kitImageUrl(order.id, sizeChart.id) : null}
-      takenNumbers={data.takenNumbers}
+      takenNumbers={data.registrations.filter((r) => !r.mine)}
       submitLabel={myItem ? "Lưu" : "Đăng ký"}
       onCancel={myItem ? () => setIsEditing(false) : undefined}
       onSubmit={async (v) => {
@@ -286,6 +296,45 @@ export default function KitRegistrationPage() {
               </div>
             )}
           </>
+        )}
+      </section>
+
+      <section className="rounded-2xl border bg-white">
+        <h2 className="flex items-baseline justify-between px-5 pt-4 pb-2 text-base font-semibold">
+          Đã đăng ký
+          <span className="text-sm font-normal text-gray-500">
+            {data.registrations.length} người
+          </span>
+        </h2>
+        {data.registrations.length === 0 ? (
+          <p className="px-5 pb-4 text-sm text-gray-500">Chưa có ai đăng ký.</p>
+        ) : (
+          <ul className="divide-y">
+            {data.registrations.map((r) => (
+              <li
+                key={r.id}
+                className={`flex items-center gap-3 px-5 py-2.5 ${
+                  r.mine ? "bg-floodlight/15" : ""
+                }`}
+              >
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-medium">
+                    {r.name}
+                    {r.mine && (
+                      <span className="ml-1 font-normal text-gray-500">(bạn)</span>
+                    )}
+                  </p>
+                  {r.printName && (
+                    <p className="truncate text-xs text-gray-500">{r.printName}</p>
+                  )}
+                </div>
+                <span className="shrink-0 text-sm text-gray-700">{sizeText(r)}</span>
+                <span className="scoreboard w-8 shrink-0 text-right text-lg text-gray-900">
+                  {r.number ?? "–"}
+                </span>
+              </li>
+            ))}
+          </ul>
         )}
       </section>
     </main>
