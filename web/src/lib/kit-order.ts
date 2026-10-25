@@ -158,13 +158,61 @@ export function priceFor(
     : order.defaultPrice;
 }
 
+const isPast = (deadline: Date | string | null) =>
+  deadline !== null && new Date(deadline).getTime() <= Date.now();
+
 /** Self-registration is open while collecting and before the deadline */
 export function isRegistrationOpen(order: {
   status: string;
-  deadline: Date | null;
+  deadline: Date | string | null;
 }): boolean {
-  if (order.status !== "Collecting") return false;
-  return !order.deadline || order.deadline.getTime() > Date.now();
+  return order.status === "Collecting" && !isPast(order.deadline);
+}
+
+/**
+ * Status to show: "Expired" is derived (collecting but past the deadline),
+ * never stored, so extending the deadline reopens registration by itself.
+ */
+export function displayStatus(order: {
+  status: "Collecting" | "Ordered" | "Delivered";
+  deadline: Date | string | null;
+}): keyof typeof KIT_ORDER_DISPLAY_STATUS_LABEL {
+  return order.status === "Collecting" && isPast(order.deadline)
+    ? "Expired"
+    : order.status;
+}
+
+export const KIT_ORDER_DISPLAY_STATUS_LABEL = {
+  ...KIT_ORDER_STATUS_LABEL,
+  Expired: "Hết hạn đăng ký",
+} as const;
+
+/**
+ * Validate a deadline from a request body. Blank clears it. A new or
+ * changed deadline must be in the future; an unchanged one may be past,
+ * so other fields of an expired order can still be edited.
+ */
+export function parseDeadline(
+  value: unknown,
+  previous: Date | null = null
+): { error: string } | { deadline: Date | null } {
+  if (isBlank(value)) return { deadline: null };
+  const deadline = new Date(value as string);
+  if (typeof value !== "string" || Number.isNaN(deadline.getTime())) {
+    return { error: "Hạn đăng ký không hợp lệ" };
+  }
+  const unchanged = previous !== null && previous.getTime() === deadline.getTime();
+  if (!unchanged && isPast(deadline)) {
+    return { error: "Hạn đăng ký phải sau thời điểm hiện tại" };
+  }
+  return { deadline };
+}
+
+/** "20:00 23/10/2026" */
+export function formatDeadline(deadline: Date | string): string {
+  const d = new Date(deadline);
+  const time = d.toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" });
+  return `${time} ${d.toLocaleDateString("vi-VN")}`;
 }
 
 /** VietQR addInfo: ASCII only, max 50 chars */
@@ -226,3 +274,64 @@ export const MAX_KIT_PREVIEW_IMAGES = 10;
 
 export const kitImageUrl = (kitOrderId: string, imageId: string) =>
   `/api/kit-orders/${kitOrderId}/images/${imageId}`;
+
+/** Value for an <input type="datetime-local"> in the browser's timezone */
+export function toDateTimeLocal(value: Date | string | null): string {
+  if (!value) return "";
+  const d = new Date(value);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(
+    d.getHours()
+  )}:${pad(d.getMinutes())}`;
+}
+
+type OrderStatus = "Collecting" | "Ordered" | "Delivered";
+const ORDER_STATUSES: OrderStatus[] = ["Collecting", "Ordered", "Delivered"];
+
+/**
+ * Work out the new status and deadline for an order edit.
+ * - A new deadline must be valid and in the future (see parseDeadline).
+ * - Changing the deadline (extending or removing it) reopens registration,
+ *   unless the same request sets the status explicitly.
+ * - "Collecting" can't be chosen while the deadline is past: extend it first.
+ */
+export function updateSchedule(
+  existing: { status: OrderStatus; deadline: Date | null },
+  body: Record<string, unknown>
+):
+  | { error: string }
+  | { status: OrderStatus; deadline: Date | null; reopened: boolean } {
+  let deadline = existing.deadline;
+  if ("deadline" in body) {
+    const parsed = parseDeadline(body.deadline, existing.deadline);
+    if ("error" in parsed) return parsed;
+    deadline = parsed.deadline;
+  }
+
+  let status = existing.status;
+  if ("status" in body) {
+    if (!ORDER_STATUSES.includes(body.status as OrderStatus)) {
+      return { error: "Trạng thái không hợp lệ" };
+    }
+    status = body.status as OrderStatus;
+  }
+
+  const deadlineChanged =
+    (deadline?.getTime() ?? null) !== (existing.deadline?.getTime() ?? null);
+  if (deadlineChanged && !("status" in body)) status = "Collecting";
+
+  if (
+    status === "Collecting" &&
+    (deadlineChanged || "status" in body) &&
+    !isRegistrationOpen({ status, deadline })
+  ) {
+    return { error: "Hạn đăng ký đã qua, hãy gia hạn để mở lại đăng ký" };
+  }
+
+  return {
+    status,
+    deadline,
+    reopened:
+      !isRegistrationOpen(existing) && isRegistrationOpen({ status, deadline }),
+  };
+}

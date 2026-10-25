@@ -12,7 +12,7 @@ import {
   itemToFormValues,
   toKitItemPayload,
 } from "@/components/KitItemForm";
-import { kitImageUrl, sizeText } from "@/src/lib/kit-order";
+import { formatDeadline, kitImageUrl, sizeText } from "@/src/lib/kit-order";
 import { KitGallery, type KitImage } from "@/components/KitImages";
 import { getDeviceId } from "@/src/lib/deviceFingerprint";
 
@@ -38,6 +38,7 @@ type PublicData = {
     defaultPrice: number;
     printOnlyPrice: number | null;
     deadline: string | null;
+    status: "Collecting" | "Ordered" | "Delivered";
     registrationOpen: boolean;
   };
   images: KitImage[];
@@ -186,7 +187,7 @@ export default function KitRegistrationPage() {
         <h1 className="relative text-2xl uppercase !text-white">{order.name}</h1>
         {order.deadline && (
           <p className="relative mt-1 text-sm text-white/80">
-            Hạn đăng ký {new Date(order.deadline).toLocaleDateString("vi-VN")}
+            Hạn đăng ký {formatDeadline(order.deadline)}
           </p>
         )}
       </header>
@@ -223,7 +224,11 @@ export default function KitRegistrationPage() {
               {form}
             </>
           ) : (
-            <p className="text-sm text-gray-600">Đợt này đã đóng đăng ký.</p>
+            <p className="text-sm text-gray-600">
+              {order.status === "Collecting"
+                ? "Đã hết hạn đăng ký."
+                : "Đợt này đã đóng đăng ký."}
+            </p>
           )
         ) : (
           <>

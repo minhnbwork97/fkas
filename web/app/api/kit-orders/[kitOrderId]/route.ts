@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { KitOrderStatus, Prisma } from "@prisma/client";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/src/lib/prisma";
 import { adminPinError } from "@/src/lib/adminGuard";
 import {
@@ -10,11 +10,10 @@ import {
   parseMoney,
   priceFor,
   summarizeKitOrder,
+  updateSchedule,
 } from "@/src/lib/kit-order";
 
 type Ctx = { params: Promise<{ kitOrderId: string }> };
-
-const STATUSES: KitOrderStatus[] = ["Collecting", "Ordered", "Delivered"];
 
 export async function GET(req: NextRequest, context: Ctx) {
   try {
@@ -100,18 +99,13 @@ export async function PATCH(req: NextRequest, context: Ctx) {
           ? body.description.trim()
           : null;
     }
-    if ("deadline" in body) {
-      data.deadline = body.deadline ? new Date(body.deadline) : null;
+    const schedule = updateSchedule(existing, body);
+    if ("error" in schedule) {
+      return NextResponse.json({ error: schedule.error }, { status: 400 });
     }
-    if ("status" in body) {
-      if (!STATUSES.includes(body.status)) {
-        return NextResponse.json(
-          { error: "Trạng thái không hợp lệ" },
-          { status: 400 }
-        );
-      }
-      data.status = body.status;
-    }
+    if ("deadline" in body) data.deadline = schedule.deadline;
+    if (schedule.status !== existing.status) data.status = schedule.status;
+
     let defaultPrice = existing.defaultPrice;
     if ("defaultPrice" in body) {
       const price = parseMoney(body.defaultPrice);
@@ -156,7 +150,7 @@ export async function PATCH(req: NextRequest, context: Ctx) {
       return order;
     });
 
-    return NextResponse.json(updated);
+    return NextResponse.json({ ...updated, reopened: schedule.reopened });
   } catch (e: unknown) {
     return NextResponse.json(
       { error: e instanceof Error ? e.message : "Lỗi hệ thống" },

@@ -3,6 +3,7 @@ import { prisma } from "@/src/lib/prisma";
 import { adminPinError } from "@/src/lib/adminGuard";
 import {
   isBlank,
+  parseDeadline,
   parseMoney,
   summarizeKitOrder,
 } from "@/src/lib/kit-order";
@@ -77,6 +78,11 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    const parsedDeadline = parseDeadline(body.deadline);
+    if ("error" in parsedDeadline) {
+      return NextResponse.json({ error: parsedDeadline.error }, { status: 400 });
+    }
+
     const order = await prisma.kitOrder.create({
       data: {
         name,
@@ -86,7 +92,7 @@ export async function POST(req: NextRequest) {
             : null,
         defaultPrice,
         printOnlyPrice,
-        deadline: body.deadline ? new Date(body.deadline) : null,
+        deadline: parsedDeadline.deadline,
       },
     });
 

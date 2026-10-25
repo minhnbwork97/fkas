@@ -27,8 +27,12 @@ import {
 } from "@/components/KitItemForm";
 import { KitImageManager, type KitImage } from "@/components/KitImages";
 import {
+  KIT_ORDER_DISPLAY_STATUS_LABEL,
   KIT_ORDER_STATUS_LABEL,
   KIT_SIZES,
+  displayStatus,
+  formatDeadline,
+  toDateTimeLocal,
   kitImageUrl,
   sizeText,
   type KitOrderSummary,
@@ -165,6 +169,7 @@ export default function KitOrderDetailPage() {
   }
 
   const { summary } = order;
+  const expired = displayStatus(order) === "Expired";
   const itemUrl = (id: string) => `${orderUrl}/items/${id}`;
   const registerLink = `${location.origin}/k/${order.id}`;
 
@@ -201,7 +206,7 @@ export default function KitOrderDetailPage() {
         <div className="flex items-center justify-between gap-3">
           <h1 className="text-2xl font-semibold">{order.name}</h1>
           <Select
-            value={order.status}
+            value={displayStatus(order)}
             onValueChange={(status) =>
               run(() => send(orderUrl, "PATCH", { status }), "Đã cập nhật")
             }
@@ -215,6 +220,12 @@ export default function KitOrderDetailPage() {
                   {label}
                 </SelectItem>
               ))}
+              {/* Derived, not selectable: extend the deadline to reopen */}
+              {expired && (
+                <SelectItem value="Expired" disabled>
+                  {KIT_ORDER_DISPLAY_STATUS_LABEL.Expired}
+                </SelectItem>
+              )}
             </SelectContent>
           </Select>
         </div>
@@ -223,14 +234,18 @@ export default function KitOrderDetailPage() {
             {vnd(order.defaultPrice)}/áo
             {order.printOnlyPrice !== null &&
               ` · chỉ in ${vnd(order.printOnlyPrice)}`}
-            {order.deadline &&
-              ` · hạn ${new Date(order.deadline).toLocaleDateString("vi-VN")}`}
+            {order.deadline && (
+              <>
+                {` · hạn ${formatDeadline(order.deadline)}`}
+                {expired && <span className="text-amber-700"> (đã hết hạn)</span>}
+              </>
+            )}
             {" · "}
             <button
               className="font-medium text-pitch hover:underline"
               onClick={() => setIsEditingInfo(true)}
             >
-              Sửa
+              {expired ? "Gia hạn" : "Sửa"}
             </button>
           </p>
         )}
@@ -242,8 +257,13 @@ export default function KitOrderDetailPage() {
             order={order}
             onCancel={() => setIsEditingInfo(false)}
             onSave={async (patch) => {
-              if (await run(() => send(orderUrl, "PATCH", patch), "Đã lưu")) {
+              let reopened = false;
+              const ok = await run(async () => {
+                reopened = (await send(orderUrl, "PATCH", patch)).reopened;
+              }, "Đã lưu");
+              if (ok) {
                 setIsEditingInfo(false);
+                if (reopened) toast.success("Đã gia hạn, mở lại đăng ký");
               }
             }}
             onDelete={() => {
@@ -620,15 +640,6 @@ function EditItemForm({
   );
 }
 
-function toLocalInput(iso: string | null): string {
-  if (!iso) return "";
-  const d = new Date(iso);
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(
-    d.getHours()
-  )}:${pad(d.getMinutes())}`;
-}
-
 function OrderInfoForm({
   order,
   onSave,
@@ -646,7 +657,8 @@ function OrderInfoForm({
   const [printOnlyPrice, setPrintOnlyPrice] = useState(
     order.printOnlyPrice === null ? "" : String(order.printOnlyPrice)
   );
-  const [deadline, setDeadline] = useState(toLocalInput(order.deadline));
+  const initialDeadline = toDateTimeLocal(order.deadline);
+  const [deadline, setDeadline] = useState(initialDeadline);
 
   return (
     <form
@@ -658,7 +670,10 @@ function OrderInfoForm({
           description,
           defaultPrice: parseInt(defaultPrice, 10),
           printOnlyPrice: printOnlyPrice ? parseInt(printOnlyPrice, 10) : null,
-          deadline: deadline ? new Date(deadline).toISOString() : null,
+          // Only send it when edited, so an expired order can still be saved
+          ...(deadline !== initialDeadline && {
+            deadline: deadline ? new Date(deadline).toISOString() : null,
+          }),
         });
       }}
     >
@@ -685,8 +700,12 @@ function OrderInfoForm({
         <Input
           type="datetime-local"
           value={deadline}
+          min={deadline !== initialDeadline ? toDateTimeLocal(new Date()) : undefined}
           onChange={(e) => setDeadline(e.target.value)}
         />
+        <p className="text-xs text-gray-500">
+          Gia hạn sẽ tự mở lại đăng ký. Để trống nếu không giới hạn.
+        </p>
       </div>
       <div className="space-y-1.5">
         <Label>Mô tả</Label>

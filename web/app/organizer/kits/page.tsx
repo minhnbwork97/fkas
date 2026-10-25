@@ -6,7 +6,9 @@ import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
+  KIT_ORDER_DISPLAY_STATUS_LABEL,
   KIT_ORDER_STATUS_LABEL,
+  displayStatus,
   type KitOrderSummary,
 } from "@/src/lib/kit-order";
 
@@ -17,6 +19,7 @@ type KitOrderListItem = {
   id: string;
   name: string;
   status: keyof typeof KIT_ORDER_STATUS_LABEL;
+  deadline: string | null;
   summary: KitOrderSummary;
 };
 
@@ -60,7 +63,8 @@ export default function OrganizerKitsPage() {
       )}
       {items && items.length > 0 && (
         <ul className="rounded-xl border bg-white divide-y">
-          {items.map(({ id, name, status, summary }) => {
+          {items.map(({ id, name, status, deadline, summary }) => {
+            const shown = displayStatus({ status, deadline });
             const pct =
               summary.totalDue > 0
                 ? (summary.totalPaid / summary.totalDue) * 100
@@ -73,8 +77,12 @@ export default function OrganizerKitsPage() {
                 >
                   <div className="flex items-baseline justify-between gap-3">
                     <p className="font-medium">{name}</p>
-                    <p className="text-xs text-gray-500 shrink-0">
-                      {KIT_ORDER_STATUS_LABEL[status]}
+                    <p
+                      className={`text-xs shrink-0 ${
+                        shown === "Expired" ? "text-amber-700" : "text-gray-500"
+                      }`}
+                    >
+                      {KIT_ORDER_DISPLAY_STATUS_LABEL[shown]}
                     </p>
                   </div>
                   <div className="h-1.5 rounded-full bg-gray-100 overflow-hidden">

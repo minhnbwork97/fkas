@@ -9,6 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import Link from "next/link";
 import { ChevronLeft } from "lucide-react";
 import { CurrencyInput } from "@/components/ui/currency-input";
+import { toDateTimeLocal } from "@/src/lib/kit-order";
 
 const PIN_KEY = "fkas_admin_pin";
 
@@ -99,6 +100,7 @@ export default function CreateKitOrderPage() {
           <Input
             type="datetime-local"
             value={deadline}
+            min={toDateTimeLocal(new Date())}
             onChange={(e) => setDeadline(e.target.value)}
           />
         </div>
