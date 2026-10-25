@@ -154,11 +154,13 @@ export default function KitRegistrationPage() {
   }
 
   const { order, player, myItem } = data;
-  const canEdit = order.registrationOpen && myItem !== null && !myItem.paid;
+  // Editable until the deadline, even once paid (type is locked then)
+  const canEdit = order.registrationOpen && myItem !== null;
   const sizeChart = data.images.find((i) => i.kind === "SizeChart");
 
   const form = (
     <KitItemForm
+      lockType={myItem?.paid ?? false}
       initial={myItem ? itemToFormValues(myItem) : undefined}
       defaultPrice={order.defaultPrice}
       printOnlyPrice={order.printOnlyPrice}
@@ -253,16 +255,18 @@ export default function KitRegistrationPage() {
                 >
                   Sửa
                 </button>
-                <button
-                  className="text-gray-500 underline-offset-4 hover:underline"
-                  onClick={() => {
-                    if (window.confirm("Huỷ đăng ký áo?")) {
-                      call("DELETE", "my-item", null, "Đã huỷ đăng ký");
-                    }
-                  }}
-                >
-                  Huỷ đăng ký
-                </button>
+                {!myItem.paid && (
+                  <button
+                    className="text-gray-500 underline-offset-4 hover:underline"
+                    onClick={() => {
+                      if (window.confirm("Huỷ đăng ký áo?")) {
+                        call("DELETE", "my-item", null, "Đã huỷ đăng ký");
+                      }
+                    }}
+                  >
+                    Huỷ đăng ký
+                  </button>
+                )}
               </div>
             )}
 

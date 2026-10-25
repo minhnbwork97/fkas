@@ -88,6 +88,7 @@ export function KitItemForm({
   defaultPrice,
   printOnlyPrice,
   sizeChartUrl = null,
+  lockType = false,
   takenNumbers = [],
   submitLabel,
   onSubmit,
@@ -101,6 +102,8 @@ export function KitItemForm({
   printOnlyPrice: number | null;
   /** Shows a "how to pick a size" link when set */
   sizeChartUrl?: string | null;
+  /** Keep Mua áo / Chỉ in fixed, e.g. once the shirt is paid for */
+  lockType?: boolean;
   /** Numbers already used by others, for a duplicate warning */
   takenNumbers?: { number: number | null; printName: string | null }[];
   submitLabel: string;
@@ -140,7 +143,12 @@ export function KitItemForm({
     <form onSubmit={submit} className="space-y-4">
       {children}
 
-      {printOnlyPrice !== null && (
+      {lockType ? (
+        <p className="text-sm text-gray-600">
+          {v.printOnly ? "Chỉ in" : "Mua áo"} · đã đóng tiền nên không đổi
+          loại áo được
+        </p>
+      ) : printOnlyPrice !== null && (
         <Choice
           options={[
             { value: "buy", label: `Mua áo · ${vnd(defaultPrice)}` },

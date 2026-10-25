@@ -11,7 +11,8 @@ type Ctx = { params: Promise<{ kitOrderId: string }> };
 
 /**
  * Resolve the caller and the order, and check the player may still change
- * their registration. Each player has at most one shirt per order.
+ * their registration (until the deadline, paid or not).
+ * Each player has at most one shirt per order.
  */
 async function loadContext(
   kitOrderId: string,
@@ -31,12 +32,6 @@ async function loadContext(
   const existing = await prisma.kitOrderItem.findUnique({
     where: { kitOrderId_playerId: { kitOrderId, playerId: player.id } },
   });
-  if (existing?.paid) {
-    return {
-      error: "Áo đã được xác nhận thu tiền, liên hệ BTC để sửa",
-      status: 409,
-    } as const;
-  }
   return { player, order, existing } as const;
 }
 
@@ -63,10 +58,20 @@ export async function PUT(req: NextRequest, context: Ctx) {
       );
     }
 
-    // Keep a price the organizer set by hand
-    const amount = existing?.priceOverridden
-      ? existing.amount
-      : priceFor(order, parsed.fields.printOnly);
+    // Paid: size, name and number can change, but not the type, which
+    // would change the price of money already collected
+    if (existing?.paid && parsed.fields.printOnly !== existing.printOnly) {
+      return NextResponse.json(
+        { error: "Đã đóng tiền nên không đổi loại áo được, liên hệ BTC" },
+        { status: 409 }
+      );
+    }
+
+    // Keep a paid amount and a price the organizer set by hand
+    const amount =
+      existing && (existing.paid || existing.priceOverridden)
+        ? existing.amount
+        : priceFor(order, parsed.fields.printOnly);
 
     const item = await prisma.kitOrderItem.upsert({
       where: { kitOrderId_playerId: { kitOrderId, playerId: player.id } },
@@ -95,6 +100,12 @@ export async function DELETE(req: NextRequest, context: Ctx) {
     }
     if (!ctx.existing) {
       return NextResponse.json({ error: "Bạn chưa đăng ký áo" }, { status: 404 });
+    }
+    if (ctx.existing.paid) {
+      return NextResponse.json(
+        { error: "Đã đóng tiền, liên hệ BTC để huỷ và hoàn tiền" },
+        { status: 409 }
+      );
     }
 
     await prisma.kitOrderItem.delete({ where: { id: ctx.existing.id } });
