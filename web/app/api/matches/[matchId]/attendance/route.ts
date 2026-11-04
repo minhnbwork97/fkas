@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/src/lib/prisma";
+import { upsertAttendance } from "@/src/lib/attendance";
 import { log } from "@/src/lib/logger";
 
 export async function POST(
@@ -16,24 +16,13 @@ export async function POST(
         { status: 400 }
       );
     }
-    // Upsert latest intent
-    const intent = await prisma.attendanceIntent.upsert({
-      where: { matchId_playerId: { matchId, playerId } },
-      update: {
-        status,
-        isLate: Boolean(isLate),
-        note: note ?? null,
-        guestCount: Number.isFinite(guestCount) ? Number(guestCount) : 0,
-        createdAt: new Date(),
-      },
-      create: {
-        matchId,
-        playerId,
-        status,
-        isLate: Boolean(isLate),
-        note: note ?? null,
-        guestCount: Number.isFinite(guestCount) ? Number(guestCount) : 0,
-      },
+    const intent = await upsertAttendance({
+      matchId,
+      playerId,
+      status,
+      isLate,
+      note,
+      guestCount,
     });
 
     log({

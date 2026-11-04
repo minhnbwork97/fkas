@@ -9,6 +9,7 @@ import {
   FileText,
   Calendar,
   Shirt,
+  Bot,
 } from "lucide-react";
 import { usePathname } from "next/navigation";
 import { PitchMarkings } from "@/components/PitchMarkings";
@@ -91,6 +92,7 @@ export default function OrganizerLayoutClient({
     { href: "/organizer/fund", label: "Quỹ Đội", icon: DollarSign },
     { href: "/organizer/receivables", label: "Công Nợ", icon: FileText },
     { href: "/organizer/kits", label: "Áo Đội", icon: Shirt },
+    { href: "/organizer/zalo", label: "Bot Zalo", icon: Bot },
   ];
 
   const isActiveLink = (href: string) => {

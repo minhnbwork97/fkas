@@ -1,4 +1,6 @@
-import { NextRequest, NextResponse } from "next/server";
+import { after, NextRequest, NextResponse } from "next/server";
+import { zaloEnabled } from "@/src/lib/zalo/api";
+import { notifyMatchCreated } from "@/src/lib/zalo/notify";
 import { prisma } from "@/src/lib/prisma";
 
 export async function POST(req: NextRequest) {
@@ -27,6 +29,9 @@ export async function POST(req: NextRequest) {
       data: { link: `/m/${match.id}` },
       select: { id: true, link: true },
     });
+    if (zaloEnabled()) {
+      after(() => notifyMatchCreated(match.id).catch((e) => console.error("[zalo]", e)));
+    }
     return NextResponse.json(
       { id: updated.id, link: updated.link },
       { status: 201 }

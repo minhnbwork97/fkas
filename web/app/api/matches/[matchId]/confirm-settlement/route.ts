@@ -1,4 +1,6 @@
-import { NextRequest, NextResponse } from "next/server";
+import { after, NextRequest, NextResponse } from "next/server";
+import { zaloEnabled } from "@/src/lib/zalo/api";
+import { notifySettlement } from "@/src/lib/zalo/notify";
 import { prisma } from "@/src/lib/prisma";
 import { assertAdmin } from "@/src/lib/adminGuard";
 import { executeTransaction } from "@/src/lib/transaction";
@@ -148,6 +150,10 @@ export async function POST(
         // If player has no fund transactions, leave settlement as unpaid (they need to pay cash)
       }
     });
+
+    if (zaloEnabled()) {
+      after(() => notifySettlement(matchId).catch((e) => console.error("[zalo]", e)));
+    }
 
     return NextResponse.json(
       {

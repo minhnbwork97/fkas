@@ -20,6 +20,7 @@ model Player {
   settlements     Settlement[]
   customAttendees CustomAttendee[]
   kitItems        KitOrderItem[]
+  zaloAccount     ZaloAccount?
 }
 
 model Match {
@@ -230,4 +231,74 @@ enum KitSize {
   XL
   XXL
   Other
+}
+
+/// Tài khoản Zalo đã nhắn với bot. Id do Zalo cấp riêng cho từng bot,
+/// dùng được cả để nhận diện trong nhóm lẫn để nhắn riêng.
+model ZaloAccount {
+  zaloUserId  String    @id
+  displayName String
+  /// Liên kết với cầu thủ sau khi người dùng nhắn đúng số điện thoại
+  playerId    String?   @unique
+  /// Được dùng lệnh organizer qua bot
+  isAdmin     Boolean   @default(false)
+  linkedAt    DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  player      Player?   @relation(fields: [playerId], references: [id], onDelete: SetNull)
+}
+
+/// Một lượt bot xử lý tin nhắn. message_id của Zalo làm khoá chính nên
+/// tin gửi lại sẽ bị bỏ qua. Dùng luôn làm bộ nhớ hội thoại, đếm tần suất
+/// và log (công cụ đã gọi, token, thời gian, lỗi).
+model ZaloTurn {
+  messageId    String   @id
+  zaloUserId   String
+  chatId       String
+  chatType     String
+  text         String
+  reply        String?
+  steps        Json?
+  inputTokens  Int?
+  outputTokens Int?
+  durationMs   Int?
+  error        String?
+  createdAt    DateTime @default(now())
+
+  @@index([zaloUserId, chatId, createdAt])
+}
+
+/// Thao tác ghi đang chờ người dùng trả lời "ok" (VD admin đánh dấu đã thu).
+/// Mỗi người, mỗi cuộc chat chỉ có một thao tác chờ.
+model ZaloPendingAction {
+  id         String   @id @default(uuid())
+  zaloUserId String
+  chatId     String
+  kind       String
+  payload    Json
+  summary    String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+
+  @@unique([zaloUserId, chatId])
+}
+
+/// Nhóm Zalo có bot. notify = nhận thông báo trận mới, nhắc điểm danh.
+model ZaloGroup {
+  chatId     String   @id
+  notify     Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  lastSeenAt DateTime @updatedAt
+}
+
+/// Thông báo đã gửi, để cron và các lần gọi lại không gửi trùng
+model ZaloNotification {
+  id        String   @id @default(uuid())
+  kind      String
+  /// matchId hoặc settlementId tuỳ loại
+  refId     String
+  chatId    String
+  createdAt DateTime @default(now())
+
+  @@unique([kind, refId, chatId])
 }
