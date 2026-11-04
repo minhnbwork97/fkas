@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Autocomplete } from "@/components/ui/autocomplete";
 
 const PIN_KEY = "fkas_admin_pin";
 const pin = () => localStorage.getItem(PIN_KEY) || "";
@@ -14,7 +15,9 @@ type Account = {
   isAdmin: boolean;
   linkedAt: string | null;
   player: { id: string; name: string } | null;
+  lastMessage: { text: string; chatType: string; createdAt: string } | null;
 };
+type Player = { id: string; name: string; phone: string | null; linked: boolean };
 type Group = { chatId: string; notify: boolean; lastSeenAt: string };
 type Turn = {
   messageId: string;
@@ -32,6 +35,7 @@ type Turn = {
 type Data = {
   configured: Record<"bot" | "openai" | "jev" | "cron", boolean>;
   accounts: Account[];
+  players: Player[];
   groups: Group[];
   turns: Turn[];
 };
@@ -43,6 +47,7 @@ export default function ZaloBotPage() {
   const router = useRouter();
   const [data, setData] = useState<Data | null>(null);
   const [error, setError] = useState("");
+  const [editing, setEditing] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     const res = await fetch(`/api/zalo/admin?adminPin=${encodeURIComponent(pin())}`);
@@ -86,6 +91,14 @@ export default function ZaloBotPage() {
   }
 
   const linked = data.accounts.filter((a) => a.player);
+  const unlinked = data.accounts.filter((a) => !a.player);
+  const freePlayers = data.players.filter((p) => !p.linked);
+  const link = async (a: Account, playerId: string) => {
+    const name = data.players.find((p) => p.id === playerId)?.name;
+    if (await act({ action: "link", zaloUserId: a.zaloUserId, playerId }, `Đã gán ${a.displayName} → ${name}`)) {
+      setEditing(null);
+    }
+  };
   const missing = Object.entries(data.configured).filter(([, ok]) => !ok).map(([k]) => k);
 
   return (
@@ -118,6 +131,34 @@ export default function ZaloBotPage() {
 
       <section className="space-y-2">
         <h2 className="text-lg font-semibold">
+          Chưa liên kết <span className="text-gray-500 font-normal">({unlinked.length})</span>
+        </h2>
+        <p className="text-sm text-gray-500">
+          Những người đã nhắn cho bot nhưng chưa gắn với cầu thủ. Chọn cầu thủ tương ứng để liên kết.
+        </p>
+        <ul className="rounded-xl border bg-white divide-y">
+          {unlinked.length === 0 && (
+            <li className="p-4 text-sm text-gray-500">Không có ai đang chờ liên kết.</li>
+          )}
+          {unlinked.map((a) => (
+            <li key={a.zaloUserId} className="space-y-2 px-4 py-3">
+              <div>
+                <p className="font-medium">{a.displayName}</p>
+                {a.lastMessage && (
+                  <p className="truncate text-xs text-gray-500">
+                    {a.lastMessage.chatType === "GROUP" ? "Trong nhóm" : "Nhắn riêng"} lúc{" "}
+                    {time(a.lastMessage.createdAt)}: “{a.lastMessage.text}”
+                  </p>
+                )}
+              </div>
+              <PlayerPicker players={freePlayers} onPick={(id) => link(a, id)} />
+            </li>
+          ))}
+        </ul>
+      </section>
+
+      <section className="space-y-2">
+        <h2 className="text-lg font-semibold">
           Tài khoản đã liên kết <span className="text-gray-500 font-normal">({linked.length})</span>
         </h2>
         <ul className="rounded-xl border bg-white divide-y">
@@ -127,11 +168,23 @@ export default function ZaloBotPage() {
             </li>
           )}
           {linked.map((a) => (
-            <li key={a.zaloUserId} className="flex items-center gap-3 px-4 py-3">
+            <li key={a.zaloUserId} className="flex flex-wrap items-center gap-3 px-4 py-3">
               <div className="min-w-0 flex-1">
                 <p className="truncate font-medium">{a.player!.name}</p>
                 <p className="truncate text-xs text-gray-500">Zalo: {a.displayName}</p>
               </div>
+              {editing === a.zaloUserId ? (
+                <div className="w-full space-y-1">
+                  <PlayerPicker players={freePlayers} onPick={(id) => link(a, id)} />
+                  <Button size="sm" variant="ghost" onClick={() => setEditing(null)}>
+                    Huỷ
+                  </Button>
+                </div>
+              ) : (
+                <Button size="sm" variant="ghost" onClick={() => setEditing(a.zaloUserId)}>
+                  Đổi cầu thủ
+                </Button>
+              )}
               <label className="flex items-center gap-1.5 text-sm">
                 <input
                   type="checkbox"
@@ -227,5 +280,35 @@ export default function ZaloBotPage() {
         </ul>
       </section>
     </main>
+  );
+}
+
+/** Search a team member who isn't linked to Zalo yet, then confirm */
+function PlayerPicker({
+  players,
+  onPick,
+}: {
+  players: Player[];
+  onPick: (playerId: string) => void;
+}) {
+  const [playerId, setPlayerId] = useState("");
+  return (
+    <div className="flex gap-2">
+      <div className="flex-1">
+        <Autocomplete
+          options={players.map((p) => ({
+            value: p.id,
+            label: p.name,
+            secondary: p.phone ?? undefined,
+          }))}
+          value={playerId}
+          onValueChange={setPlayerId}
+          placeholder="Tìm cầu thủ chưa liên kết..."
+        />
+      </div>
+      <Button size="sm" disabled={!playerId} onClick={() => onPick(playerId)}>
+        Gán
+      </Button>
+    </div>
   );
 }
