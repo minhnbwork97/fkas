@@ -59,7 +59,7 @@ export async function handleUpdate(update: ZaloUpdate): Promise<void> {
     if (recent > RATE_LIMIT_PER_MINUTE) {
       // Say it once, then stay quiet until they slow down
       if (recent === RATE_LIMIT_PER_MINUTE + 1) {
-        await reply("Bạn nhắn nhanh quá, đợi mình một phút rồi nhắn tiếp nhé.");
+        await reply("Từ từ thôi, nhắn như ra đòn phản công thế này mình đỡ không kịp 😵 Nghỉ 1 phút rồi nhắn tiếp nha.");
       } else {
         await finishTurn(msg.message_id, { durationMs: 0, error: "rate_limited" });
       }
@@ -76,7 +76,7 @@ export async function handleUpdate(update: ZaloUpdate): Promise<void> {
     if (!account.player) {
       await reply(
         isGroup
-          ? `${msg.from.display_name} ơi, nhắn riêng cho mình số điện thoại bạn đã đăng ký với đội để mình nhận ra bạn nhé.`
+          ? `${msg.from.display_name} ơi, mình chưa biết bạn là cầu thủ nào 🧐 Nhắn riêng cho mình số điện thoại đã đăng ký với đội để mình check thẻ cầu thủ nhé.`
           : await linkAccount(msg.from.id, text)
       );
       return;
@@ -103,11 +103,11 @@ export async function handleUpdate(update: ZaloUpdate): Promise<void> {
       }
       if (decision === "cancel") {
         await clearPendingAction(msg.from.id, chatId);
-        await reply("Đã huỷ, mình chưa làm gì cả.");
+        await reply("Ok huỷ kèo, coi như mình chưa thấy gì 🙈");
         return;
       }
       if (decision === "unsure") {
-        await reply(`Mình chưa chắc ý bạn. ${pending.summary}: bạn đồng ý hay huỷ?`);
+        await reply(`Câu này mình đọc như xem VAR vẫn chưa ra 🤔 ${pending.summary}: bạn đồng ý hay huỷ?`);
         return;
       }
       // Something else: drop the proposal and handle the message normally
@@ -121,7 +121,7 @@ export async function handleUpdate(update: ZaloUpdate): Promise<void> {
       user: text,
       tools: buildTools(ctx),
     });
-    await reply(result.text || "Mình chưa hiểu ý bạn, bạn nói lại giúp mình nhé.", {
+    await reply(result.text || "Pha này mình xử lý hỏng rồi 😅 Bạn nói lại kiểu khác giúp mình nhé.", {
       steps: result.steps,
       inputTokens: result.inputTokens,
       outputTokens: result.outputTokens,
@@ -129,7 +129,7 @@ export async function handleUpdate(update: ZaloUpdate): Promise<void> {
     });
   } catch (e) {
     console.error("[zalo] handleUpdate", e);
-    await sendMessage(chatId, "Xin lỗi, mình đang gặp lỗi, bạn thử lại sau ít phút nhé.").catch(() => {});
+    await sendMessage(chatId, "Mình đang bị chuột rút, vài phút nữa bạn thử lại nhé 🤕").catch(() => {});
     await finishTurn(msg.message_id, {
       durationMs: Date.now() - started,
       error: e instanceof Error ? e.message : String(e),
@@ -141,27 +141,30 @@ export async function handleUpdate(update: ZaloUpdate): Promise<void> {
 async function linkAccount(zaloUserId: string, text: string): Promise<string> {
   const phone = text.match(PHONE_LIKE)?.[0];
   if (!phone) {
-    return "Chào bạn 👋 Mình là bot của FC Không Giải Tán.\nNhắn cho mình số điện thoại bạn đã đăng ký với đội để mình nhận ra bạn nhé.";
+    return "Hế lô 👋 Mình là bot của FC Không Giải Tán, chuyên điểm danh, đòi nợ tiền sân và tám chuyện.\nNhắn mình số điện thoại bạn đã đăng ký với đội để mình nhận mặt nha.";
   }
   const player = await findPlayerByPhone(phone);
   if (!player) {
-    return "Mình không tìm thấy số này trong danh sách đội. Bạn kiểm tra lại số, hoặc nhờ BTC thêm bạn vào đội nhé.";
+    return "Số này không có trong đội hình 🤨 Bạn kiểm tra lại số, hoặc nhờ BTC đăng ký cho bạn trước nhé.";
   }
   const taken = await prisma.zaloAccount.findUnique({ where: { playerId: player.id } });
   if (taken && taken.zaloUserId !== zaloUserId) {
-    return "Số này đã được liên kết với một tài khoản Zalo khác. Nếu đó không phải bạn, hãy báo BTC nhé.";
+    return "Số này có người khác nhận rồi 👀 Nếu không phải bạn thì báo BTC kiểm tra giúp nhé.";
   }
   await prisma.zaloAccount.update({
     where: { zaloUserId },
     data: { playerId: player.id, linkedAt: new Date() },
   });
-  return `Đã nhận ra bạn là ${player.name} ✅\nBạn có thể nhắn tự nhiên, ví dụ:\n- Tuần này em đi, thêm 1 bạn\n- Tuần này bao nhiêu người đi?\n- Mình còn nợ bao nhiêu?`;
+  return `À ${player.name} đây rồi ✅ Từ giờ cứ nhắn thoải mái như nói chuyện với anh em, ví dụ:\n- Tuần này em đi, thêm 1 bạn\n- Tuần này bao nhiêu người đi?\n- Mình còn nợ bao nhiêu?`;
 }
 
 /** Exported for the evaluation script, so it tests the real prompt */
 export function systemPrompt(ctx: ToolContext): string {
   return [
-    "Bạn là bot Zalo của đội bóng FC Không Giải Tán, nói chuyện thân thiện, ngắn gọn như anh em trong đội. Luôn xưng 'mình' và gọi người dùng là 'bạn'.",
+    "Bạn là bot Zalo của đội bóng phủi FC Không Giải Tán. Tính cách: cợt nhả, lầy, hay trêu như một thằng bạn trong đội, thích chêm chuyện bóng đá (thẻ đỏ, VAR, việt vị, ngồi dự bị, chấn thương giả...) và emoji. Luôn xưng 'mình' và gọi người dùng là 'bạn': 'mình' chỉ bao giờ là bot, nói về người đang hỏi (VD họ đi kèm mấy bạn) thì dùng 'bạn'.",
+    "Đổi kiểu đùa liên tục, đừng lặp lại cùng một hình ảnh (VD không câu nào cũng nhắc VAR); xem lịch sử hội thoại để tránh trùng. Không phải câu trả lời nào cũng cần đùa.",
+    "Đùa ở giọng văn, không đùa ở dữ liệu: ngày giờ, số tiền, ai đi ai không, đã ghi gì phải đúng và rõ ràng. Mỗi câu trả lời chỉ một hai câu đùa, ngắn gọn, đừng để trò đùa che mất thông tin.",
+    "Trêu nhẹ nhàng thân thiện: không thô tục, không xúc phạm ngoại hình hay cá nhân, không chế giễu ai vì nợ tiền trước mặt người khác. Khi hỏi xác nhận thao tác về tiền thì hỏi nghiêm túc, rõ ràng.",
     "QUAN TRỌNG: chỉ nói đã ghi/đã làm/đã ghi nhận khi một công cụ trong lượt này trả về thành công. Nếu chưa gọi công cụ hoặc công cụ báo lỗi thì không được nói là đã làm.",
     `Người đang nhắn: ${ctx.player.name}${ctx.isAdmin ? " (BTC/admin)" : ""}. Bây giờ là ${formatMatchTime(new Date())} giờ Việt Nam.`,
     ctx.isGroup

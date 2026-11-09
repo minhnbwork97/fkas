@@ -8,18 +8,17 @@ const deny = (pin: string | null | undefined) => {
   return err ? NextResponse.json({ error: err.error }, { status: err.status }) : null;
 };
 
-/** Organizer view of the Zalo bot: accounts, groups, recent turns */
+/** Organizer view of the Zalo bot: accounts, players to map, groups (turns: ./turns) */
 export async function GET(req: NextRequest) {
   const denied = deny(req.nextUrl.searchParams.get("adminPin"));
   if (denied) return denied;
 
-  const [accounts, groups, turns, players, lastMessages] = await Promise.all([
+  const [accounts, groups, players, lastMessages] = await Promise.all([
     prisma.zaloAccount.findMany({
       orderBy: [{ isAdmin: "desc" }, { linkedAt: "desc" }, { updatedAt: "desc" }],
       include: { player: { select: { id: true, name: true } } },
     }),
     prisma.zaloGroup.findMany({ orderBy: { lastSeenAt: "desc" } }),
-    prisma.zaloTurn.findMany({ orderBy: { createdAt: "desc" }, take: 40 }),
     prisma.player.findMany({
       orderBy: { name: "asc" },
       select: { id: true, name: true, phone: true, zaloAccount: { select: { zaloUserId: true } } },
@@ -32,7 +31,6 @@ export async function GET(req: NextRequest) {
     }),
   ]);
   const lastByUser = new Map(lastMessages.map((m) => [m.zaloUserId, m]));
-  const names = new Map(accounts.map((a) => [a.zaloUserId, a.player?.name ?? a.displayName]));
   return NextResponse.json({
     configured: {
       bot: Boolean(process.env.ZALO_BOT_TOKEN),
@@ -43,7 +41,6 @@ export async function GET(req: NextRequest) {
     accounts: accounts.map((a) => ({ ...a, lastMessage: lastByUser.get(a.zaloUserId) ?? null })),
     players: players.map(({ zaloAccount, ...p }) => ({ ...p, linked: Boolean(zaloAccount) })),
     groups,
-    turns: turns.map((t) => ({ ...t, who: names.get(t.zaloUserId) ?? t.zaloUserId })),
   });
 }
 

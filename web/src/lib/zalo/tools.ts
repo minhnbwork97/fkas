@@ -146,9 +146,8 @@ export function buildTools(ctx: ToolContext): ToolSet {
 
         const pastDeadline = new Date() > attendanceDeadline(match.dateTime);
         const record = { match: formatMatchTime(match.dateTime), status, guestCount, isLate, note };
-        if (ctx.dryRun) return { dryRun: true, wouldSave: record };
-
-        await upsertAttendance({
+        // Dry runs answer exactly like real ones, so evaluations see the same flow
+        if (!ctx.dryRun) await upsertAttendance({
           matchId: match.id,
           playerId: ctx.player.id,
           status,
